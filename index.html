@@ -128,11 +128,43 @@
   .ex .info { flex: 1; min-width: 0; }
   .ex .nm { font-weight: 600; }
   .ex .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .ex .last { color: var(--life); font-weight: 600; }
-  .ex .pr { color: var(--accent); font-weight: 700; }
-  .wtwrap { display: flex; align-items: center; gap: 4px; flex: none; }
-  input.wt { width: 64px; background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 8px 6px; border-radius: 10px; font: inherit; font-size: 16px; text-align: center; }
-  .wtwrap span { font-size: 12px; color: var(--muted); }
+  /* set-by-set logging */
+  .exc { background: var(--card2); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; overflow: hidden; }
+  .exc.done { border-color: var(--lift); }
+  .exc-head { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 58px; padding: 10px 12px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .exc-head .info { flex: 1; min-width: 0; }
+  .exc-head .nm { font-weight: 700; overflow-wrap: anywhere; }
+  .exc.done .exc-head .nm { color: var(--lift); }
+  .exc-head .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .exc-head .cnt { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .exc.done .exc-head .cnt { color: var(--lift); }
+  .chev { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-size: 14px; transition: transform .15s; }
+  .exc.closed .chev { transform: rotate(-90deg); }
+  .exc-body { padding: 0 8px 10px; }
+  .exc.closed .exc-body { display: none; }
+  table.sets-t { width: 100%; border-collapse: separate; border-spacing: 0 4px; table-layout: fixed; }
+  .sets-t th { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .5px; text-align: center; padding: 2px 2px 0; }
+  .sets-t th.c-set { width: 40px; }
+  .sets-t th.c-lbs { width: 23%; }
+  .sets-t th.c-reps { width: 19%; }
+  .sets-t th.c-ck { width: 52px; }
+  .sets-t td { padding: 0 3px; text-align: center; vertical-align: middle; }
+  .sets-t td:first-child { border-radius: 10px 0 0 10px; }
+  .sets-t td:last-child { border-radius: 0 10px 10px 0; }
+  .sets-t .sn { font-weight: 700; font-size: 15px; }
+  .sets-t .pv { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sets-t tr.done td { background: var(--accent-dim); }
+  .sets-t tr.done .sn { color: var(--accent); }
+  input.si { width: 100%; height: 44px; background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; font: inherit; font-size: 17px; font-weight: 600; text-align: center; padding: 0 2px; }
+  input.si::placeholder { color: var(--muted); opacity: .55; font-weight: 400; }
+  input.si:focus { outline: none; border-color: var(--lift); }
+  .sets-t tr.done input.si { background: transparent; border-color: transparent; }
+  .setck { width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg); color: var(--muted); font: inherit; font-size: 20px; font-weight: 700; cursor: pointer; display: grid; place-items: center; padding: 0; margin: 0 auto; }
+  .sets-t tr.done .setck { background: var(--accent); border-color: var(--accent); color: #062312; }
+  .exc-foot { display: flex; gap: 8px; padding: 6px 4px 0; }
+  .exc-foot .mini { flex: 1; min-height: 44px; font-weight: 600; }
+  .exc-foot .mini.add { border-color: var(--lift); color: var(--lift); }
+  .exc-foot .mini:disabled { opacity: .4; cursor: default; }
   .exform { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
   .exform input.txt { padding: 9px 10px; }
   .exform .sets { flex: 0 0 96px; }
@@ -457,37 +489,87 @@
   }
 
   // ================= lifting log =================
-  // Find the last time (before today) you logged a weight for an exercise with this name.
-  function lastWeight(name) {
-    const key = norm(name), today = todayKey();
+  // liftLog[day].ex[exercise name, lowercased] = { sets: [{ wt, reps, done }], done, wt }.
+  // Older saves only have { wt, done } (one weight per exercise) — that still counts as set 1.
+  const hasOwn = (o, k) => !!o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
+  const str = v => (v === undefined || v === null ? "" : String(v));
+  const cleanWt = v => str(v).replace(/[^0-9.]/g, "").slice(0, 6);
+  const cleanReps = v => str(v).replace(/[^0-9]/g, "").slice(0, 3);
+  const blankSet = () => ({ wt: "", reps: "", done: false });
+  // "2 × 6–8" → 2 sets. Anything we can't read starts at 3.
+  function planSets(plan) {
+    const t = str(plan);
+    const m = t.match(/(\d+)\s*[×xX*]/) || t.match(/^\s*(\d+)/);
+    const n = m ? parseInt(m[1], 10) : 3;
+    return Math.min(Math.max(n || 3, 1), 20);
+  }
+  function logEntry(day, name) {
+    const log = state.liftLog[day];
+    return log && hasOwn(log.ex, norm(name)) ? log.ex[norm(name)] : null;
+  }
+  // The sets you actually finished in a logged entry, by set number (null = nothing for that set).
+  function loggedSets(e) {
+    if (!e || typeof e !== "object") return [];
+    if (Array.isArray(e.sets)) return e.sets.map(x => x && x.done && (str(x.wt) || str(x.reps)) ? { wt: str(x.wt), reps: str(x.reps) } : null);
+    return str(e.wt) !== "" ? [{ wt: str(e.wt), reps: "" }] : [];
+  }
+  // Last time (before today) you did an exercise with this name, from any routine.
+  function prevSession(name) {
+    const today = todayKey();
     const days = Object.keys(state.liftLog).filter(d => d < today).sort().reverse();
     for (const d of days) {
-      const e = state.liftLog[d] && state.liftLog[d].ex && state.liftLog[d].ex[key];
-      if (e && e.wt !== undefined && e.wt !== "") {
+      const sets = loggedSets(logEntry(d, name));
+      if (sets.some(Boolean)) {
         const dt = new Date(d + "T12:00:00");
-        return { wt: e.wt, label: SHORT_DAYS[dt.getDay()] + " " + (dt.getMonth() + 1) + "/" + dt.getDate() };
+        return { sets: sets, label: SHORT_DAYS[dt.getDay()] + " " + (dt.getMonth() + 1) + "/" + dt.getDate() };
       }
     }
     return null;
   }
-  function todayEntry(name) {
-    const log = state.liftLog[todayKey()];
-    return log && log.ex ? log.ex[norm(name)] : null;
-  }
+  function todayEntry(name) { return logEntry(todayKey(), name); }
   function setEntry(name, patch) {
     const k = todayKey();
-    if (!state.liftLog[k]) state.liftLog[k] = { w: todaysLift(), ex: {} };
+    if (!state.liftLog[k] || typeof state.liftLog[k] !== "object") state.liftLog[k] = { w: todaysLift(), ex: {} };
+    if (!state.liftLog[k].ex || typeof state.liftLog[k].ex !== "object") state.liftLog[k].ex = {};
     state.liftLog[k].w = todaysLift();
     const key = norm(name);
-    state.liftLog[k].ex[key] = Object.assign({ done: false, wt: "" }, state.liftLog[k].ex[key] || {}, patch);
+    const old = hasOwn(state.liftLog[k].ex, key) ? state.liftLog[k].ex[key] : {};
+    state.liftLog[k].ex[key] = Object.assign({ done: false, wt: "" }, old, patch);
+    return state.liftLog[k].ex[key];
   }
-  // When every exercise is checked, mark today done on the week strip.
+  // Today's rows for an exercise (read-only view; nothing is saved until you touch it).
+  function todaySets(ex) {
+    const e = todayEntry(ex.name);
+    if (e && Array.isArray(e.sets) && e.sets.length)
+      return e.sets.map(x => ({ wt: cleanWt(x && x.wt), reps: cleanReps(x && x.reps), done: !!(x && x.done) }));
+    const rows = [];
+    for (let i = 0, n = planSets(ex.sets); i < n; i++) rows.push(blankSet());
+    if (e) {                                   // logged today with the older one-weight version
+      rows[0].wt = cleanWt(e.wt);
+      if (e.done) rows.forEach(r => { r.done = true; });
+    }
+    return rows;
+  }
+  // Saved, editable rows for an exercise.
+  function editSets(ex) {
+    const rows = todaySets(ex);
+    return setEntry(ex.name, { sets: rows }).sets;
+  }
+  // Keep the simple fields in step so older versions of the app still read the log.
+  function summarize(ex) {
+    const e = todayEntry(ex.name);
+    if (!e || !Array.isArray(e.sets)) return;
+    e.done = e.sets.length > 0 && e.sets.every(x => x.done);
+    const wts = e.sets.filter(x => x.done && x.wt !== "").map(x => parseFloat(x.wt)).filter(n => !isNaN(n));
+    e.wt = wts.length ? String(Math.max.apply(null, wts)) : "";
+  }
+  const exDone = ex => { const r = todaySets(ex); return r.length > 0 && r.every(x => x.done); };
+  // When every set of every exercise is checked, mark today done on the week strip.
   function syncLiftDone() {
     const w = todaysLift(), i = weekIndex(new Date());
     const list = w ? state.workouts[w] || [] : [];
     if (!w || !list.length) return;
-    const all = list.every(ex => { const e = todayEntry(ex.name); return e && e.done; });
-    state.liftDone[i] = all ? w : false;
+    state.liftDone[i] = list.every(exDone) ? w : false;
   }
 
   // ================= routines =================
@@ -531,6 +613,7 @@
   let renaming = null;        // routine name being renamed
   let confirmDel = null;      // routine name waiting for "Delete?" confirmation
   let routineNote = "";       // message shown in the routines box
+  const folded = new Set();   // exercise cards you've folded closed (by name)
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -678,7 +761,7 @@
     ep.classList.toggle("on", editingPlan);
     document.getElementById("liftNote").textContent = editingPlan
       ? "Tap a day to switch: " + state.routines.concat(["Rest"]).join(" → ") + "."
-      : "Resets every Monday. Your weights are saved forever.";
+      : "Resets every Monday. Your sets are saved forever.";
 
     const ab = document.getElementById("abs");
     ab.innerHTML = "";
@@ -722,11 +805,8 @@
     if (!exs.length) list.appendChild(el("div", "empty", "No exercises yet. Tap “Edit exercises” to add some."));
 
     exs.forEach(ex => {
-      const entry = todayEntry(ex.name) || {};
-      const last = lastWeight(ex.name);
-      const row = el("div", "row ex" + (entry.done ? " done" : ""));
-
       if (editingEx) {
+        const row = el("div", "row ex");
         const info = el("div", "info");
         info.append(el("div", "nm", ex.name), el("div", "meta", ex.sets));
         const del = el("button", "del", "×"); del.title = "Remove";
@@ -736,42 +816,7 @@
         return;
       }
 
-      const box = checkBox();
-      box.addEventListener("click", () => { setEntry(ex.name, { done: !entry.done }); syncLiftDone(); changed(); });
-
-      const info = el("div", "info");
-      info.appendChild(el("div", "nm", ex.name));
-      const meta = el("div", "meta");
-      meta.append(ex.sets);
-      if (last) {
-        meta.append(" · Last: ");
-        meta.appendChild(el("span", "last", last.wt + " lbs"));
-        meta.append(" (" + last.label + ")");
-        const cur = parseFloat(entry.wt), prev = parseFloat(last.wt);
-        if (!isNaN(cur) && !isNaN(prev) && cur > prev) { meta.append(" "); meta.appendChild(el("span", "pr", "▲ +" + (Math.round((cur - prev) * 10) / 10))); }
-      } else {
-        meta.append(" · first time");
-      }
-      info.appendChild(meta);
-
-      const wrap = el("div", "wtwrap");
-      const inp = document.createElement("input");
-      inp.className = "wt";
-      inp.type = "text";
-      inp.inputMode = "decimal";
-      inp.placeholder = last ? String(last.wt) : "—";
-      inp.value = entry.wt || "";
-      inp.setAttribute("aria-label", ex.name + " weight in pounds");
-      inp.addEventListener("input", () => {
-        const val = inp.value.replace(/[^0-9.]/g, "").slice(0, 6);
-        if (val !== inp.value) inp.value = val;
-        setEntry(ex.name, { wt: val });
-        save();                                   // save without redrawing so typing isn't interrupted
-      });
-      wrap.append(inp, el("span", "", "lbs"));
-
-      row.append(box, info, wrap);
-      list.appendChild(row);
+      list.appendChild(exerciseCard(ex));
     });
 
     if (editingEx && state.workouts[w]) {
@@ -793,6 +838,117 @@
       edit.appendChild(f);
       edit.appendChild(el("div", "liftnote", "Changes here apply to every " + w + " day."));
     }
+  }
+
+  // One card per exercise: SET | PREV | LBS | REPS | ✓
+  function exerciseCard(ex) {
+    const key = norm(ex.name);
+    const rows = todaySets(ex);
+    const prev = prevSession(ex.name);
+    const doneN = rows.filter(r => r.done).length;
+    const allDone = rows.length > 0 && doneN === rows.length;
+    const card = el("div", "exc" + (allDone ? " done" : "") + (folded.has(key) ? " closed" : ""));
+
+    const head = el("button", "exc-head");
+    head.type = "button";
+    head.setAttribute("aria-expanded", folded.has(key) ? "false" : "true");
+    const info = el("div", "info");
+    info.append(el("div", "nm", ex.name),
+      el("div", "meta", ex.sets + (prev ? " · Last: " + prev.label : " · first time")));
+    head.append(info, el("span", "cnt", allDone ? "Done ✓" : doneN + " / " + rows.length), el("span", "chev", "▾"));
+    head.addEventListener("click", () => { if (folded.has(key)) folded.delete(key); else folded.add(key); render(); });
+    card.appendChild(head);
+
+    const body = el("div", "exc-body");
+    const table = el("table", "sets-t");
+    const thead = el("thead"), hr = el("tr");
+    [["SET", "c-set"], ["PREV", "c-prev"], ["LBS", "c-lbs"], ["REPS", "c-reps"], ["✓", "c-ck"]].forEach(h => hr.appendChild(el("th", h[1], h[0])));
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = el("tbody");
+
+    let aboveWt = "", aboveReps = "";            // what the row above has, for sets you didn't do last time
+    rows.forEach((r, i) => {
+      const p = prev && prev.sets[i];
+      const hintWt = p && p.wt ? p.wt : aboveWt;
+      const hintReps = p && p.reps ? p.reps : aboveReps;
+      aboveWt = r.wt || hintWt; aboveReps = r.reps || hintReps;
+
+      const tr = el("tr", r.done ? "done" : "");
+      tr.appendChild(el("td", "sn", String(i + 1)));
+      let pv = "—";
+      if (p) pv = p.reps ? (p.wt || "—") + " x " + p.reps : p.wt + " lbs";
+      tr.appendChild(el("td", "pv", pv));
+
+      const mk = (field, hint, mode, clean, label) => {
+        const inp = document.createElement("input");
+        inp.className = "si";
+        inp.type = "text";
+        inp.inputMode = mode;
+        if (mode === "numeric") inp.pattern = "[0-9]*";
+        inp.autocomplete = "off";
+        inp.enterKeyHint = "done";
+        inp.placeholder = hint || "—";
+        inp.value = r[field];
+        inp.setAttribute("aria-label", ex.name + " set " + (i + 1) + " " + label);
+        inp.addEventListener("input", () => {
+          const val = clean(inp.value);
+          if (val !== inp.value) inp.value = val;
+          const sets = editSets(ex);
+          if (sets[i]) sets[i][field] = val;
+          summarize(ex);
+          save();                                 // save without redrawing so typing isn't interrupted
+        });
+        const td = el("td");
+        td.appendChild(inp);
+        return td;
+      };
+      tr.appendChild(mk("wt", hintWt, "decimal", cleanWt, "pounds"));
+      tr.appendChild(mk("reps", hintReps, "numeric", cleanReps, "reps"));
+
+      const ck = el("button", "setck", "✓");
+      ck.type = "button";
+      ck.setAttribute("aria-label", (r.done ? "Undo " : "Finish ") + "set " + (i + 1));
+      ck.addEventListener("click", () => {
+        const sets = editSets(ex), x = sets[i];
+        if (!x) return;
+        if (!x.done) {                            // same as last time? just tap ✓
+          if (x.wt === "" && hintWt) x.wt = cleanWt(hintWt);
+          if (x.reps === "" && hintReps) x.reps = cleanReps(hintReps);
+        }
+        x.done = !x.done;
+        summarize(ex); syncLiftDone(); changed();
+      });
+      const td = el("td");
+      td.appendChild(ck);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    body.appendChild(table);
+
+    const foot = el("div", "exc-foot");
+    const rm = el("button", "mini", "− Remove set");
+    rm.type = "button";
+    rm.disabled = rows.length <= 1;
+    rm.addEventListener("click", () => {
+      const sets = editSets(ex);
+      if (sets.length <= 1) return;
+      sets.pop();
+      summarize(ex); syncLiftDone(); changed();
+    });
+    const add = el("button", "mini add", "+ Add set");
+    add.type = "button";
+    add.addEventListener("click", () => {
+      const sets = editSets(ex);
+      if (sets.length >= 20) return;
+      sets.push(blankSet());
+      summarize(ex); syncLiftDone(); changed();
+    });
+    foot.append(rm, add);
+    body.appendChild(foot);
+    card.appendChild(body);
+    return card;
   }
 
   function renderRoutines() {
