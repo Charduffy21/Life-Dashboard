@@ -1,6 +1,6 @@
 // Service worker: lets the app open with no internet.
 // When you change the app, bump VERSION so phones grab the new files.
-const VERSION = "life-v2";
+const VERSION = "life-v3";
 const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", event => {

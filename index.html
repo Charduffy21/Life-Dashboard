@@ -48,6 +48,7 @@
   .ring .pct { position: absolute; inset: 0; display: grid; place-items: center; font-family: "Bebas Neue", sans-serif; font-size: 26px; }
   .ring .lbl { position: absolute; bottom: -16px; width: 100%; text-align: center; font-size: 11px; color: var(--muted); }
   .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .grid > * { min-width: 0; }
   @media (min-width: 760px) {
     .grid { grid-template-columns: 1fr 1fr; }
     .span2 { grid-column: span 2; }
@@ -142,9 +143,26 @@
   .rt .nm { font-weight: 600; overflow-wrap: anywhere; }
   .rt .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .rt .acts { display: flex; gap: 6px; flex: none; align-items: center; }
-  .rt .mini { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; font: inherit; font-size: 13px; padding: 0 12px; min-height: 36px; cursor: pointer; }
-  .rt .mini.danger { border-color: var(--danger); color: var(--danger); }
+  .mini { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; font: inherit; font-size: 13px; padding: 0 12px; min-height: 36px; cursor: pointer; }
+  .mini.danger { border-color: var(--danger); color: var(--danger); }
   .rt input.txt { padding: 8px 10px; }
+
+  /* habit editor */
+  #editHabits.on { color: var(--accent); }
+  .hnote { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .hform { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed var(--line); border-radius: 14px; margin-bottom: 8px; }
+  .hform .two { display: flex; gap: 6px; }
+  .hform .two .note { flex: 0 0 34%; }
+  .hform input.txt { padding: 9px 10px; }
+  .hform .lbl { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  .hdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .hdays button { background: var(--card2); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; font: inherit; font-size: 11px; padding: 7px 0; cursor: pointer; }
+  .hdays button.on { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .hform .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .hform .bar .chip { margin: 0; }
+  .hform .bar .chip.on { background: rgba(255,181,71,.14); border-color: var(--life); color: var(--life); }
+  .hform .bar .grow { flex: 1; }
+  .hform .bar .mini { min-height: 44px; }
 
   .goal.done .n { color: var(--life); }
   .goal .trophy { font-size: 16px; }
@@ -195,7 +213,7 @@
     </section>
 
     <section class="card">
-      <h2>Daily habits <small id="habitCount"></small></h2>
+      <h2>Daily habits <small><span id="habitCount"></span> · <button class="link" id="editHabits">Edit habits</button></small></h2>
       <div id="habits"></div>
     </section>
 
@@ -276,11 +294,14 @@
   const norm = s => String(s).trim().toLowerCase();
   const CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#062312" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
 
-  const HABITS = [
-    { id: "mobility", name: "Morning mobility", meta: "10 min" },
+  // Starting habits. Your own list is saved as state.habitList; the ids stay the same so old checkmarks and streaks carry over.
+  // days: which days it shows up, Mon … Sun (same order as the lifting week).
+  const ALL_DAYS = () => [true,true,true,true,true,true,true];
+  const DEFAULT_HABITS = [
+    { id: "mobility", name: "Morning mobility", meta: "10 min", streak: false },
     { id: "cs50p",    name: "CS50P",            meta: "30 min", streak: true },
     { id: "spanish",  name: "Spanish",          meta: "daily",  streak: true },
-    { id: "stretch",  name: "Night stretch",    meta: "20 min" }
+    { id: "stretch",  name: "Night stretch",    meta: "20 min", streak: false }
   ];
   const DEFAULT_ROUTINES = ["Push", "Pull", "Upper"];   // starting routines; you can add, rename and delete your own
   const DEFAULT_PLAN = ["Push", "Pull", "", "Upper", "", "", ""];
@@ -303,6 +324,21 @@
   // Routine names become keys in saved data, so keep them sensible.
   function validRoutineName(n) {
     return n.length <= 30 && norm(n) !== "rest" && !(n in Object.prototype);
+  }
+
+  // Clean up the saved habit list (older saves don't have one, so they get the 4 starting habits).
+  function normalizeHabits(list) {
+    if (!Array.isArray(list)) return DEFAULT_HABITS.map(h => Object.assign({}, h, { days: ALL_DAYS() }));
+    const out = [];
+    list.forEach(h => {
+      if (!h || typeof h !== "object" || typeof h.id !== "string" || !h.id || (h.id in Object.prototype)) return;
+      if (out.some(x => x.id === h.id)) return;
+      const name = typeof h.name === "string" ? h.name.trim().slice(0, 40) : "";
+      if (!name) return;
+      const days = Array.isArray(h.days) && h.days.length === 7 ? h.days.map(Boolean) : ALL_DAYS();
+      out.push({ id: h.id, name: name, meta: typeof h.meta === "string" ? h.meta.trim().slice(0, 30) : "", days: days, streak: !!h.streak });
+    });
+    return out;
   }
 
   // Make sure every field exists (so older saves keep working after updates).
@@ -328,14 +364,23 @@
     });
     const liftDone = Array.isArray(s.liftDone) && s.liftDone.length === 7 ? s.liftDone.slice() : blank7();
     liftDone.forEach((v, i) => { if (v === true) liftDone[i] = plan[i] || "Lift"; }); // old true/false saves
+    const habitList = normalizeHabits(s.habitList);
+    const history = {};
+    if (s.history && typeof s.history === "object") Object.keys(s.history).forEach(k => {
+      if (Array.isArray(s.history[k]) && !(k in Object.prototype)) history[k] = s.history[k].filter(x => typeof x === "string");
+    });
+    habitList.forEach(h => { if (!history[h.id]) history[h.id] = []; });
+    const habits = {};
+    if (s.habits && typeof s.habits === "object") Object.keys(s.habits).forEach(k => { if (!(k in Object.prototype)) habits[k] = !!s.habits[k]; });
     return {
-      v: 2,
+      v: 3,
       day: typeof s.day === "string" ? s.day : todayKey(),
       dayType: s.dayType || defaultDayType(new Date()),
       work: !!s.work,
-      habits: Object.assign({ mobility: false, cs50p: false, spanish: false, stretch: false }, s.habits || {}),
+      habitList: habitList,
+      habits: habits,
       tasks: Array.isArray(s.tasks) ? s.tasks : [],
-      history: Object.assign({ cs50p: [], spanish: [] }, s.history || {}),
+      history: history,
       liftPlan: plan,
       liftWeek: typeof s.liftWeek === "string" ? s.liftWeek : weekKey(),
       liftDone: liftDone,
@@ -356,7 +401,7 @@
       s.dayType = defaultDayType(new Date());
       s.work = false;
       s.todayLift = null;
-      s.habits = { mobility: false, cs50p: false, spanish: false, stretch: false };
+      s.habits = {};
       s.tasks = s.tasks.filter(t => !t.done).map(t => Object.assign({}, t, { carried: true }));
     }
     if (s.liftWeek !== weekKey()) {
@@ -495,13 +540,30 @@
   }
   function checkBox() { const b = el("div", "box"); b.innerHTML = CHECK; return b; }
 
-  function streak(id) {
-    const set = new Set(state.history[id] || []);
+  // Streak = how many scheduled days in a row you did it. Days the habit isn't scheduled are skipped.
+  // Today only breaks the streak once it's over, so an unchecked habit today still shows yesterday's streak.
+  function streak(h) {
+    if (!h.days.some(Boolean)) return 0;
+    const set = new Set(state.history[h.id] || []);
     const d = new Date();
-    if (!set.has(dayKey(d))) d.setDate(d.getDate() - 1);
     let n = 0;
-    while (set.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+    for (let i = 0; i < 2000; i++) {
+      if (h.days[weekIndex(d)]) {
+        if (set.has(dayKey(d))) n++;
+        else if (i > 0) break;
+      }
+      d.setDate(d.getDate() - 1);
+    }
     return n;
+  }
+  const habitsToday = () => { const i = weekIndex(new Date()); return state.habitList.filter(h => h.days[i]); };
+  function daysLabel(days) {
+    const on = days.map((v, i) => v ? i : -1).filter(i => i >= 0);
+    if (on.length === 7) return "Every day";
+    if (!on.length) return "No days";
+    if (on.join() === "0,1,2,3,4") return "Weekdays";
+    if (on.join() === "5,6") return "Weekends";
+    return on.map(i => WEEK_LABELS[i]).join(", ");
   }
 
   function render() {
@@ -536,22 +598,10 @@
     });
 
     // ---- habits ----
-    const hb = document.getElementById("habits");
-    hb.innerHTML = "";
-    let hDone = 0;
-    HABITS.forEach(h => {
-      const done = !!state.habits[h.id];
-      if (done) hDone++;
-      const row = el("div", "row click" + (done ? " done" : ""));
-      row.append(checkBox(), el("div", "n", h.name), el("div", "m", h.meta));
-      if (h.streak) {
-        const s = streak(h.id);
-        if (s > 0) { const st = el("span", "streak", "🔥 " + s); st.title = s + "-day streak"; row.appendChild(st); }
-      }
-      row.addEventListener("click", () => toggleHabit(h.id));
-      hb.appendChild(row);
-    });
-    document.getElementById("habitCount").textContent = hDone + " / " + HABITS.length;
+    const todays = habitsToday();
+    const hDone = todays.filter(h => state.habits[h.id]).length;
+    renderHabits(todays);
+    document.getElementById("habitCount").textContent = hDone + " / " + todays.length;
 
     renderLifting(ti);
 
@@ -592,7 +642,7 @@
 
     // ---- progress ring: habits + to-dos + today's lift ----
     const liftToday = todaysLift() ? 1 : 0;
-    const total = HABITS.length + state.tasks.length + liftToday;
+    const total = todays.length + state.tasks.length + liftToday;
     const done = hDone + state.tasks.filter(t => t.done).length + (liftToday && state.liftDone[ti] ? 1 : 0);
     const pct = total ? Math.round(done / total * 100) : 0;
     document.getElementById("pct").textContent = pct + "%";
@@ -825,13 +875,163 @@
     box.appendChild(el("div", "liftnote", routineNote || "To give a routine its exercises, pick it below and tap “Edit exercises”."));
   }
 
+  // ================= habits =================
+  let editingHabits = false;
+  let habitEditId = null;     // habit being edited
+  let habitConfirmDel = null; // habit waiting for "Delete?" confirmation
+  let habitNote = "";
+  const blankDraft = () => ({ name: "", meta: "", days: ALL_DAYS(), streak: true });
+  let addDraft = blankDraft();
+  let editDraft = null;
+
+  function renderHabits(todays) {
+    const eh = document.getElementById("editHabits");
+    eh.textContent = editingHabits ? "Done" : "Edit habits";
+    eh.classList.toggle("on", editingHabits);
+    const hb = document.getElementById("habits");
+    hb.innerHTML = "";
+
+    if (!editingHabits) {
+      if (!state.habitList.length) hb.appendChild(el("div", "empty", "No habits yet. Tap “Edit habits” to add some."));
+      else if (!todays.length) hb.appendChild(el("div", "empty", "No habits scheduled today. Enjoy it."));
+      todays.forEach(h => {
+        const done = !!state.habits[h.id];
+        const row = el("div", "row click" + (done ? " done" : ""));
+        row.append(checkBox(), el("div", "n", h.name));
+        if (h.meta) row.appendChild(el("div", "m", h.meta));
+        if (h.streak) {
+          const s = streak(h);
+          if (s > 0) { const st = el("span", "streak", "🔥 " + s); st.title = s + (s === 1 ? " scheduled day" : " scheduled days") + " in a row"; row.appendChild(st); }
+        }
+        row.addEventListener("click", () => toggleHabit(h.id));
+        hb.appendChild(row);
+      });
+      const off = state.habitList.filter(h => todays.indexOf(h) < 0);
+      if (off.length) hb.appendChild(el("div", "hnote", "Not today: " + off.map(h => h.name).join(", ")));
+      return;
+    }
+
+    if (!state.habitList.length) hb.appendChild(el("div", "empty", "No habits yet. Add one below."));
+    state.habitList.forEach(h => {
+      if (habitEditId === h.id && editDraft) {
+        hb.appendChild(habitForm(editDraft, "Save", () => {
+          const err = habitError(editDraft, h.id);
+          if (err) { habitNote = err; render(); return; }
+          h.name = editDraft.name.trim(); h.meta = editDraft.meta.trim(); h.days = editDraft.days.slice(); h.streak = editDraft.streak;
+          habitEditId = null; editDraft = null; habitNote = "";
+          changed();
+        }, () => { habitEditId = null; editDraft = null; habitNote = ""; render(); }));
+        return;
+      }
+      const row = el("div", "row rt");
+      const info = el("div", "info");
+      const bits = [];
+      if (h.meta) bits.push(h.meta);
+      bits.push(daysLabel(h.days));
+      if (h.streak) bits.push("🔥 streak");
+      info.append(el("div", "nm", h.name), el("div", "meta", bits.join(" · ")));
+      const acts = el("div", "acts");
+      if (habitConfirmDel === h.id) {
+        info.lastChild.textContent = "Delete this habit and its streak?";
+        const yes = el("button", "mini danger", "Delete");
+        yes.addEventListener("click", () => {
+          state.habitList = state.habitList.filter(x => x.id !== h.id);
+          delete state.habits[h.id]; delete state.history[h.id];
+          habitConfirmDel = null; habitNote = "Deleted " + h.name + ".";
+          changed();
+        });
+        const no = el("button", "mini", "Cancel");
+        no.addEventListener("click", () => { habitConfirmDel = null; render(); });
+        acts.append(yes, no);
+      } else {
+        const ed = el("button", "mini", "Edit");
+        ed.addEventListener("click", () => {
+          habitEditId = h.id; habitConfirmDel = null; habitNote = "";
+          editDraft = { name: h.name, meta: h.meta, days: h.days.slice(), streak: h.streak };
+          render();
+        });
+        const del = el("button", "del", "×"); del.title = "Delete " + h.name;
+        del.addEventListener("click", () => { habitConfirmDel = h.id; habitEditId = null; editDraft = null; habitNote = ""; render(); });
+        acts.append(ed, del);
+      }
+      row.append(info, acts);
+      hb.appendChild(row);
+    });
+
+    if (!habitEditId) {
+      hb.appendChild(el("div", "sub", "Add a habit"));
+      hb.appendChild(habitForm(addDraft, "Add", () => {
+        const err = habitError(addDraft, null);
+        if (err) { habitNote = err; render(); return; }
+        let id = uid();
+        while (state.habitList.some(x => x.id === id) || state.history[id]) id = uid();
+        state.habitList.push({ id: id, name: addDraft.name.trim(), meta: addDraft.meta.trim(), days: addDraft.days.slice(), streak: addDraft.streak });
+        state.history[id] = [];
+        habitNote = "Added " + addDraft.name.trim() + ".";
+        addDraft = blankDraft();
+        changed();
+      }, null));
+    }
+    hb.appendChild(el("div", "hnote", habitNote || "Checkmarks and streaks are kept when you edit a habit."));
+  }
+
+  // Returns an error message, or "" if the habit is OK. `exceptId` is the habit being edited.
+  function habitError(d, exceptId) {
+    const n = d.name.trim();
+    if (!n) return "Give the habit a name.";
+    if (state.habitList.some(h => h.id !== exceptId && norm(h.name) === norm(n))) return "You already have a habit called " + n + ".";
+    if (!d.days.some(Boolean)) return "Pick at least one day.";
+    return "";
+  }
+
+  // One form for adding and editing. Typing goes into `draft`, so tapping a day doesn't wipe what you typed.
+  function habitForm(draft, saveLabel, onSave, onCancel) {
+    const f = el("form", "hform");
+    const two = el("div", "two");
+    const nm = document.createElement("input");
+    nm.className = "txt"; nm.value = draft.name; nm.maxLength = 40; nm.autocomplete = "off";
+    nm.placeholder = "New habit"; nm.setAttribute("aria-label", "Habit name");
+    nm.addEventListener("input", () => { draft.name = nm.value; });
+    const note = document.createElement("input");
+    note.className = "txt note"; note.value = draft.meta; note.maxLength = 30; note.autocomplete = "off";
+    note.placeholder = "Note"; note.setAttribute("aria-label", "Note, like 10 min (optional)");
+    note.addEventListener("input", () => { draft.meta = note.value; });
+    two.append(nm, note);
+
+    const lbl = el("div", "lbl");
+    lbl.appendChild(el("span", "", "Shows up on"));
+    const every = el("button", "link", "Every day"); every.type = "button";
+    every.addEventListener("click", () => { draft.days = ALL_DAYS(); render(); });
+    lbl.appendChild(every);
+    const days = el("div", "hdays");
+    WEEK_LABELS.forEach((d, i) => {
+      const b = el("button", draft.days[i] ? "on" : "", d); b.type = "button";
+      b.setAttribute("aria-pressed", draft.days[i] ? "true" : "false");
+      b.addEventListener("click", () => { draft.days[i] = !draft.days[i]; render(); });
+      days.appendChild(b);
+    });
+
+    const bar = el("div", "bar");
+    const st = el("button", "chip" + (draft.streak ? " on" : ""), draft.streak ? "🔥 Streak on" : "🔥 Streak off"); st.type = "button";
+    st.setAttribute("aria-pressed", draft.streak ? "true" : "false");
+    st.addEventListener("click", () => { draft.streak = !draft.streak; render(); });
+    const ok = el("button", "btn", saveLabel); ok.type = "submit";
+    bar.append(st, el("div", "grow"), ok);
+    if (onCancel) {
+      const c = el("button", "mini", "Cancel"); c.type = "button";
+      c.addEventListener("click", onCancel);
+      bar.appendChild(c);
+    }
+    f.append(two, lbl, days, bar);
+    f.addEventListener("submit", e => { e.preventDefault(); onSave(); });
+    return f;
+  }
+
   function toggleHabit(id) {
     state.habits[id] = !state.habits[id];
-    if (state.history[id]) {
-      const k = todayKey();
-      state.history[id] = state.history[id].filter(x => x !== k);
-      if (state.habits[id]) state.history[id].push(k);
-    }
+    const k = todayKey();
+    state.history[id] = (state.history[id] || []).filter(x => x !== k);
+    if (state.habits[id]) state.history[id].push(k);
     changed();
   }
 
@@ -852,6 +1052,11 @@
   });
   document.getElementById("clearDone").addEventListener("click", () => {
     state.tasks = state.tasks.filter(t => !t.done); changed();
+  });
+  document.getElementById("editHabits").addEventListener("click", () => {
+    editingHabits = !editingHabits; habitEditId = null; editDraft = null; habitConfirmDel = null; habitNote = "";
+    if (editingHabits) addDraft = blankDraft();
+    render();
   });
   document.getElementById("editPlan").addEventListener("click", () => { editingPlan = !editingPlan; render(); });
   document.getElementById("editEx").addEventListener("click", () => { editingEx = !editingEx; render(); });
