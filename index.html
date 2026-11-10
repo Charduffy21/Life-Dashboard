@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Life Dashboard</title>
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Life">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161c24;
+    --card2: #1d2530;
+    --line: #2a3441;
+    --text: #e8edf3;
+    --muted: #8b97a6;
+    --accent: #3ddc84;
+    --accent-dim: rgba(61,220,132,.14);
+    --school: #5aa9ff;
+    --soccer: #3ddc84;
+    --coding: #c08bff;
+    --life: #ffb547;
+    --lift: #ff7a59;
+    --lift-dim: rgba(255,122,89,.16);
+    --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, sans-serif; font-size: 15px; line-height: 1.4;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 18px 14px 40px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .hello { font-family: "Bebas Neue", Inter, sans-serif; font-weight: 400; font-size: 40px; letter-spacing: .5px; line-height: 1; margin: 0; }
+  .date { color: var(--muted); margin-top: 6px; font-size: 14px; }
+  .ring { position: relative; width: 78px; height: 78px; flex: none; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .pct { position: absolute; inset: 0; display: grid; place-items: center; font-family: "Bebas Neue", sans-serif; font-size: 26px; }
+  .ring .lbl { position: absolute; bottom: -16px; width: 100%; text-align: center; font-size: 11px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 760px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .span2 { grid-column: span 2; }
+  }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .card h2 { font-family: "Bebas Neue", sans-serif; font-weight: 400; font-size: 24px; letter-spacing: .6px; margin: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card h2 small { font-family: Inter, sans-serif; font-size: 12px; color: var(--muted); letter-spacing: 0; text-align: right; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--card2); color: var(--muted); padding: 6px 12px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip.on { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .chip.liftc.on { background: var(--lift-dim); border-color: var(--lift); color: var(--lift); }
+
+  .block { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--card2); margin-bottom: 8px; border-left: 4px solid var(--c, var(--line)); }
+  .block .t { font-size: 12px; color: var(--muted); width: 104px; flex: none; white-space: nowrap; }
+  .block .n { font-weight: 600; flex: 1; }
+  .block.past { opacity: .45; }
+  .block .now { font-size: 11px; font-weight: 700; color: var(--bg); background: var(--accent); padding: 2px 8px; border-radius: 999px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 2px; }
+
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px; background: var(--card2); margin-bottom: 8px; border: 1px solid transparent; }
+  .row.click { cursor: pointer; user-select: none; }
+  .row.done { border-color: var(--accent); background: var(--accent-dim); }
+  .box { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--line); display: grid; place-items: center; flex: none; cursor: pointer; }
+  .box svg { opacity: 0; }
+  .done .box { background: var(--accent); border-color: var(--accent); }
+  .done .box svg { opacity: 1; }
+  .row .n { flex: 1; font-weight: 600; word-break: break-word; min-width: 0; }
+  .row .m { font-size: 12px; color: var(--muted); }
+  .streak { font-size: 12px; color: var(--life); font-weight: 700; white-space: nowrap; }
+
+  form.add { display: flex; gap: 8px; margin-bottom: 10px; }
+  input.txt { flex: 1; min-width: 0; background: var(--card2); border: 1px solid var(--line); color: var(--text); padding: 11px 12px; border-radius: 12px; font: inherit; font-size: 16px; }
+  input.txt:focus, input.wt:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .btn { background: var(--accent); color: #062312; border: 0; border-radius: 12px; padding: 0 16px; font: inherit; font-weight: 700; cursor: pointer; min-height: 44px; }
+  .btn.lift { background: var(--lift); color: #2a0d05; }
+
+  .cats .chip[data-cat="school"].on { color: var(--school); border-color: var(--school); background: rgba(90,169,255,.14); }
+  .cats .chip[data-cat="soccer"].on { color: var(--soccer); border-color: var(--soccer); }
+  .cats .chip[data-cat="coding"].on { color: var(--coding); border-color: var(--coding); background: rgba(192,139,255,.14); }
+  .cats .chip[data-cat="life"].on { color: var(--life); border-color: var(--life); background: rgba(255,181,71,.14); }
+  .task .n { font-weight: 500; }
+  .task.done { border-color: transparent; background: var(--card2); }
+  .task.done .n { text-decoration: line-through; color: var(--muted); }
+  .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px; }
+  .tag.school { color: var(--school); background: rgba(90,169,255,.14); }
+  .tag.soccer { color: var(--soccer); background: var(--accent-dim); }
+  .tag.coding { color: var(--coding); background: rgba(192,139,255,.14); }
+  .tag.life { color: var(--life); background: rgba(255,181,71,.14); }
+  .carried { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .del { background: none; border: 0; color: var(--muted); font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1; }
+  .del:hover { color: var(--danger); }
+  .link { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0; }
+  .link.on { color: var(--lift); }
+
+  /* lifting */
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 2px; text-align: center; cursor: pointer; user-select: none; min-height: 70px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .day .d { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .day .w { font-size: 12px; font-weight: 700; }
+  .day .w.rest { color: var(--muted); font-weight: 400; }
+  .day.today { border-color: var(--text); }
+  .day.done { background: var(--lift-dim); border-color: var(--lift); }
+  .day.done .w { color: var(--lift); }
+  .day .ck { font-size: 14px; height: 16px; color: var(--lift); }
+  .day.editing { border-style: dashed; }
+  .abs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; }
+  .abs button { background: var(--card2); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; font: inherit; font-size: 11px; padding: 6px 0; cursor: pointer; }
+  .abs button.on { background: rgba(255,181,71,.16); border-color: var(--life); color: var(--life); font-weight: 700; }
+  .sub { font-size: 12px; color: var(--muted); margin: 14px 0 4px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .liftnote { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .today-lift { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .tl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .tl-title { font-family: "Bebas Neue", sans-serif; font-size: 22px; letter-spacing: .5px; }
+  .tl-title span { color: var(--lift); }
+  .ex.done { border-color: var(--lift); background: var(--lift-dim); }
+  .ex.done .box { background: var(--lift); border-color: var(--lift); }
+  .ex .info { flex: 1; min-width: 0; }
+  .ex .nm { font-weight: 600; }
+  .ex .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ex .last { color: var(--life); font-weight: 600; }
+  .ex .pr { color: var(--accent); font-weight: 700; }
+  .wtwrap { display: flex; align-items: center; gap: 4px; flex: none; }
+  input.wt { width: 64px; background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 8px 6px; border-radius: 10px; font: inherit; font-size: 16px; text-align: center; }
+  .wtwrap span { font-size: 12px; color: var(--muted); }
+  .exform { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .exform input.txt { padding: 9px 10px; }
+  .exform .sets { flex: 0 0 96px; }
+
+  .goal.done .n { color: var(--life); }
+  .goal .trophy { font-size: 16px; }
+
+  footer { margin-top: 22px; text-align: center; font-size: 12px; color: var(--muted); }
+  footer .links { display: flex; gap: 16px; justify-content: center; }
+  .restore { margin-top: 10px; display: none; }
+  .restore.show { display: block; }
+  textarea { width: 100%; min-height: 90px; background: var(--card2); border: 1px solid var(--line); color: var(--text); border-radius: 12px; padding: 10px; font: inherit; font-size: 13px; }
+  .msg { margin-top: 8px; min-height: 16px; }
+  .install { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 14px; margin-bottom: 14px; display: none; }
+  .install.show { display: flex; gap: 10px; align-items: center; }
+  .install b { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="install" id="install">
+    <div style="flex:1">Make this an app: tap <b>Share</b> ⬆️ then <b>Add to Home Screen</b>.</div>
+    <button class="del" id="installX" title="Hide">×</button>
+  </div>
+
+  <header>
+    <div>
+      <h1 class="hello" id="hello">Let's go, Charlie</h1>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="ring" title="How much of today you've done">
+      <svg width="78" height="78" viewBox="0 0 78 78">
+        <circle cx="39" cy="39" r="32" fill="none" stroke="#2a3441" stroke-width="8"/>
+        <circle id="ringArc" cx="39" cy="39" r="32" fill="none" stroke="#3ddc84" stroke-width="8" stroke-linecap="round" stroke-dasharray="201.06" stroke-dashoffset="201.06" style="transition: stroke-dashoffset .4s"/>
+      </svg>
+      <div class="pct" id="pct">0%</div>
+      <div class="lbl">today</div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Today's schedule</h2>
+      <div class="chips" id="dayType">
+        <button class="chip" data-type="practice">Practice day</button>
+        <button class="chip" data-type="game">Game day</button>
+        <button class="chip" data-type="off">Day off</button>
+        <button class="chip" id="workChip">+ Work tonight</button>
+      </div>
+      <div id="schedule"></div>
+    </section>
+
+    <section class="card">
+      <h2>Daily habits <small id="habitCount"></small></h2>
+      <div id="habits"></div>
+    </section>
+
+    <section class="card span2">
+      <h2>Lifting <small><span id="liftCount"></span> · <button class="link" id="editPlan">Edit week</button></small></h2>
+      <div class="week" id="week"></div>
+      <div class="sub"><span>Abs</span><span id="absCount"></span></div>
+      <div class="abs" id="abs"></div>
+      <div class="liftnote" id="liftNote"></div>
+
+      <div class="today-lift">
+        <div class="tl-head">
+          <div class="tl-title" id="tlTitle"></div>
+          <button class="link" id="editEx">Edit exercises</button>
+        </div>
+        <div class="chips" id="liftPick"></div>
+        <div id="exList"></div>
+        <div id="exEdit"></div>
+      </div>
+    </section>
+
+    <section class="card span2">
+      <h2>To-do <small><button class="link" id="clearDone">Clear finished</button></small></h2>
+      <form class="add" id="addForm">
+        <input class="txt" id="taskInput" placeholder="Add something you need to do…" maxlength="140" autocomplete="off">
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <div class="chips cats" id="cats">
+        <button class="chip" data-cat="school">School</button>
+        <button class="chip" data-cat="soccer">Soccer</button>
+        <button class="chip" data-cat="coding">Coding</button>
+        <button class="chip" data-cat="life">Life</button>
+      </div>
+      <div id="tasks"></div>
+    </section>
+
+    <section class="card span2">
+      <h2>Goals board <small id="goalCount"></small></h2>
+      <form class="add" id="goalForm">
+        <input class="txt" id="goalInput" placeholder="Add a big goal…" maxlength="120" autocomplete="off">
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <div id="goals"></div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="links">
+      <button class="link" id="backupBtn">Copy backup</button>
+      <button class="link" id="restoreBtn">Restore from backup</button>
+    </div>
+    <div class="restore" id="restoreBox">
+      <textarea id="restoreText" placeholder="Paste your backup here…"></textarea>
+      <button class="btn" id="restoreGo" style="margin-top:8px">Restore</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // ================= helpers =================
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const SHORT_DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const WEEK_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const pad = n => String(n).padStart(2, "0");
+  const dayKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const todayKey = () => dayKey(new Date());
+  const weekIndex = d => (d.getDay() + 6) % 7;            // Mon = 0 … Sun = 6
+  const weekKey = () => { const d = new Date(); d.setDate(d.getDate() - weekIndex(d)); return dayKey(d); };
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const norm = s => String(s).trim().toLowerCase();
+  const CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#062312" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+
+  const HABITS = [
+    { id: "mobility", name: "Morning mobility", meta: "10 min" },
+    { id: "cs50p",    name: "CS50P",            meta: "30 min", streak: true },
+    { id: "spanish",  name: "Spanish",          meta: "daily",  streak: true },
+    { id: "stretch",  name: "Night stretch",    meta: "20 min" }
+  ];
+  const WORKOUT_NAMES = ["Push", "Pull", "Upper"];
+  const DEFAULT_PLAN = ["Push", "Pull", "", "Upper", "", "", ""];
+  const DEFAULT_SETS = "2 × 6–8";
+  const DEFAULT_WORKOUTS = {
+    Push:  ["Bench press", "Incline dumbbell press", "Shoulder press", "Lateral raises", "Tricep pushdowns"],
+    Pull:  ["Pull-ups", "Barbell row", "Lat pulldown", "Rear delt fly", "Bicep curls"],
+    Upper: ["Incline bench press", "Seated cable row", "Dumbbell shoulder press", "Hammer curls", "Overhead tricep extension"]
+  };
+  const DEFAULT_GOALS = ["Break into the starting lineup", "Go pro", "Finish CS50P"];
+  const blank7 = () => [false,false,false,false,false,false,false];
+
+  function defaultDayType(d) {
+    const w = d.getDay();
+    if (w === 3 || w === 6) return "game";   // games usually Wed + Sat
+    if (w === 0) return "off";
+    return "practice";
+  }
+
+  // Make sure every field exists (so older saves keep working after updates).
+  function normalize(s) {
+    if (!s || typeof s !== "object") s = {};
+    const workouts = {};
+    WORKOUT_NAMES.forEach(w => {
+      const list = s.workouts && Array.isArray(s.workouts[w]) ? s.workouts[w] : null;
+      workouts[w] = list || DEFAULT_WORKOUTS[w].map(n => ({ id: uid(), name: n, sets: DEFAULT_SETS }));
+    });
+    const liftDone = Array.isArray(s.liftDone) && s.liftDone.length === 7 ? s.liftDone.slice() : blank7();
+    const plan = Array.isArray(s.liftPlan) && s.liftPlan.length === 7 ? s.liftPlan : DEFAULT_PLAN.slice();
+    liftDone.forEach((v, i) => { if (v === true) liftDone[i] = plan[i] || "Lift"; }); // old true/false saves
+    return {
+      v: 2,
+      day: typeof s.day === "string" ? s.day : todayKey(),
+      dayType: s.dayType || defaultDayType(new Date()),
+      work: !!s.work,
+      habits: Object.assign({ mobility: false, cs50p: false, spanish: false, stretch: false }, s.habits || {}),
+      tasks: Array.isArray(s.tasks) ? s.tasks : [],
+      history: Object.assign({ cs50p: [], spanish: [] }, s.history || {}),
+      liftPlan: plan,
+      liftWeek: typeof s.liftWeek === "string" ? s.liftWeek : weekKey(),
+      liftDone: liftDone,
+      absDone: Array.isArray(s.absDone) && s.absDone.length === 7 ? s.absDone : blank7(),
+      todayLift: typeof s.todayLift === "string" ? s.todayLift : null,
+      workouts: workouts,
+      liftLog: s.liftLog && typeof s.liftLog === "object" ? s.liftLog : {},
+      goals: Array.isArray(s.goals) ? s.goals : DEFAULT_GOALS.map(t => ({ id: uid(), text: t, done: false }))
+    };
+  }
+
+  // New day: unfinished to-dos carry over, habits reset. New week: lifting checkmarks reset.
+  function rollover(raw) {
+    const s = normalize(raw);
+    if (s.day !== todayKey()) {
+      s.day = todayKey();
+      s.dayType = defaultDayType(new Date());
+      s.work = false;
+      s.todayLift = null;
+      s.habits = { mobility: false, cs50p: false, spanish: false, stretch: false };
+      s.tasks = s.tasks.filter(t => !t.done).map(t => Object.assign({}, t, { carried: true }));
+    }
+    if (s.liftWeek !== weekKey()) {
+      s.liftWeek = weekKey();
+      s.liftDone = blank7();
+      s.absDone = blank7();
+    }
+    Object.keys(s.history).forEach(k => { s.history[k] = s.history[k].slice(-180); });
+    const logDays = Object.keys(s.liftLog).sort();
+    if (logDays.length > 150) logDays.slice(0, logDays.length - 150).forEach(k => delete s.liftLog[k]);
+    return s;
+  }
+
+  // ================= saving (on this phone) =================
+  const LS_KEY = "life-dashboard";
+  let saveTimer = null;
+  function load() { try { const r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+      catch (e) { flash("Couldn't save — your phone storage may be full."); }
+    }, 250);
+  }
+  function changed() { render(); save(); }
+
+  let state = rollover(load());
+
+  // ================= schedule =================
+  function todaysLift() {
+    if (state.todayLift !== null) return state.todayLift;      // "" means rest
+    return state.liftPlan[weekIndex(new Date())] || "";
+  }
+  function blocks() {
+    const d = new Date(), w = d.getDay(), weekday = w >= 1 && w <= 5;
+    const b = [];
+    if (weekday) b.push({ s: 8*60, e: 12*60+45, n: "School", c: "var(--school)" });
+    if (state.dayType === "practice") {
+      if (w === 1 || w === 3 || w === 5) b.push({ s: 14*60, e: 15*60, n: "Team gym", c: "var(--life)" });
+      b.push({ s: 15*60+30, e: 17*60, n: "Practice", c: "var(--soccer)" });
+    }
+    if (state.dayType === "game") b.push({ s: null, e: null, n: "Game day — check kickoff time", c: "var(--soccer)" });
+    if (state.work) b.push({ s: 18*60, e: 20*60+30, n: "Work", c: "var(--coding)" });
+    const lift = todaysLift();
+    if (lift) b.push({ s: null, e: null, n: "Lift: " + lift + (state.liftDone[weekIndex(d)] ? " ✓" : ""), c: "var(--lift)", tag: "Anytime" });
+    return b;
+  }
+  function fmt(m) {
+    let h = Math.floor(m / 60), mm = m % 60;
+    const ap = h >= 12 ? "pm" : "am";
+    h = h % 12 || 12;
+    return h + ":" + pad(mm) + ap;
+  }
+
+  // ================= lifting log =================
+  // Find the last time (before today) you logged a weight for an exercise with this name.
+  function lastWeight(name) {
+    const key = norm(name), today = todayKey();
+    const days = Object.keys(state.liftLog).filter(d => d < today).sort().reverse();
+    for (const d of days) {
+      const e = state.liftLog[d] && state.liftLog[d].ex && state.liftLog[d].ex[key];
+      if (e && e.wt !== undefined && e.wt !== "") {
+        const dt = new Date(d + "T12:00:00");
+        return { wt: e.wt, label: SHORT_DAYS[dt.getDay()] + " " + (dt.getMonth() + 1) + "/" + dt.getDate() };
+      }
+    }
+    return null;
+  }
+  function todayEntry(name) {
+    const log = state.liftLog[todayKey()];
+    return log && log.ex ? log.ex[norm(name)] : null;
+  }
+  function setEntry(name, patch) {
+    const k = todayKey();
+    if (!state.liftLog[k]) state.liftLog[k] = { w: todaysLift(), ex: {} };
+    state.liftLog[k].w = todaysLift();
+    const key = norm(name);
+    state.liftLog[k].ex[key] = Object.assign({ done: false, wt: "" }, state.liftLog[k].ex[key] || {}, patch);
+  }
+  // When every exercise is checked, mark today done on the week strip.
+  function syncLiftDone() {
+    const w = todaysLift(), i = weekIndex(new Date());
+    const list = w ? state.workouts[w] || [] : [];
+    if (!w || !list.length) return;
+    const all = list.every(ex => { const e = todayEntry(ex.name); return e && e.done; });
+    state.liftDone[i] = all ? w : false;
+  }
+
+  // ================= render =================
+  let newCat = "school";
+  let editingPlan = false;
+  let editingEx = false;
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function checkBox() { const b = el("div", "box"); b.innerHTML = CHECK; return b; }
+
+  function streak(id) {
+    const set = new Set(state.history[id] || []);
+    const d = new Date();
+    if (!set.has(dayKey(d))) d.setDate(d.getDate() - 1);
+    let n = 0;
+    while (set.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+
+  function render() {
+    const now = new Date();
+    const hr = now.getHours();
+    const ti = weekIndex(now);
+    document.getElementById("hello").textContent =
+      (hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening") + ", Charlie";
+    document.getElementById("date").textContent =
+      DAYS[now.getDay()] + ", " + MONTHS[now.getMonth()] + " " + now.getDate();
+
+    // ---- day type ----
+    document.querySelectorAll("#dayType [data-type]").forEach(c =>
+      c.classList.toggle("on", c.dataset.type === state.dayType));
+    const wc = document.getElementById("workChip");
+    wc.classList.toggle("on", !!state.work);
+    wc.textContent = state.work ? "Working tonight ✓" : "+ Work tonight";
+
+    // ---- schedule ----
+    const sch = document.getElementById("schedule");
+    sch.innerHTML = "";
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const bl = blocks();
+    if (!bl.length) sch.appendChild(el("div", "empty", "Nothing scheduled. Rest up."));
+    bl.forEach(b => {
+      const row = el("div", "block");
+      row.style.setProperty("--c", b.c);
+      if (b.e !== null && mins >= b.e) row.classList.add("past");
+      row.append(el("div", "t", b.s === null ? (b.tag || "TBD") : fmt(b.s) + "–" + fmt(b.e)), el("div", "n", b.n));
+      if (b.s !== null && mins >= b.s && mins < b.e) row.appendChild(el("span", "now", "NOW"));
+      sch.appendChild(row);
+    });
+
+    // ---- habits ----
+    const hb = document.getElementById("habits");
+    hb.innerHTML = "";
+    let hDone = 0;
+    HABITS.forEach(h => {
+      const done = !!state.habits[h.id];
+      if (done) hDone++;
+      const row = el("div", "row click" + (done ? " done" : ""));
+      row.append(checkBox(), el("div", "n", h.name), el("div", "m", h.meta));
+      if (h.streak) {
+        const s = streak(h.id);
+        if (s > 0) { const st = el("span", "streak", "🔥 " + s); st.title = s + "-day streak"; row.appendChild(st); }
+      }
+      row.addEventListener("click", () => toggleHabit(h.id));
+      hb.appendChild(row);
+    });
+    document.getElementById("habitCount").textContent = hDone + " / " + HABITS.length;
+
+    renderLifting(ti);
+
+    // ---- tasks ----
+    document.querySelectorAll("#cats .chip").forEach(c => c.classList.toggle("on", c.dataset.cat === newCat));
+    const tl = document.getElementById("tasks");
+    tl.innerHTML = "";
+    if (!state.tasks.length) tl.appendChild(el("div", "empty", "No to-dos yet. Add homework, training, anything."));
+    state.tasks.slice().sort((a, b) => a.done - b.done).forEach(t => {
+      const row = el("div", "row task" + (t.done ? " done" : ""));
+      const box = checkBox();
+      box.addEventListener("click", () => { t.done = !t.done; changed(); });
+      const n = el("div", "n", t.text);
+      if (t.carried && !t.done) { n.appendChild(document.createElement("br")); n.appendChild(el("span", "carried", "from yesterday")); }
+      const del = el("button", "del", "×"); del.title = "Delete";
+      del.addEventListener("click", () => { state.tasks = state.tasks.filter(x => x.id !== t.id); changed(); });
+      row.append(box, n, el("span", "tag " + t.cat, t.cat), del);
+      tl.appendChild(row);
+    });
+
+    // ---- goals ----
+    const gl = document.getElementById("goals");
+    gl.innerHTML = "";
+    if (!state.goals.length) gl.appendChild(el("div", "empty", "Add the big things you're working toward."));
+    state.goals.slice().sort((a, b) => a.done - b.done).forEach(g => {
+      const row = el("div", "row goal" + (g.done ? " done" : ""));
+      const box = checkBox();
+      box.addEventListener("click", () => { g.done = !g.done; changed(); });
+      row.append(box, el("div", "n", g.text));
+      if (g.done) row.appendChild(el("span", "trophy", "🏆"));
+      const del = el("button", "del", "×"); del.title = "Delete";
+      del.addEventListener("click", () => { state.goals = state.goals.filter(x => x.id !== g.id); changed(); });
+      row.appendChild(del);
+      gl.appendChild(row);
+    });
+    const gDone = state.goals.filter(g => g.done).length;
+    document.getElementById("goalCount").textContent = gDone ? gDone + " achieved" : "";
+
+    // ---- progress ring: habits + to-dos + today's lift ----
+    const liftToday = todaysLift() ? 1 : 0;
+    const total = HABITS.length + state.tasks.length + liftToday;
+    const done = hDone + state.tasks.filter(t => t.done).length + (liftToday && state.liftDone[ti] ? 1 : 0);
+    const pct = total ? Math.round(done / total * 100) : 0;
+    document.getElementById("pct").textContent = pct + "%";
+    document.getElementById("ringArc").setAttribute("stroke-dashoffset", String(201.06 * (1 - pct / 100)));
+  }
+
+  function renderLifting(ti) {
+    // ---- week strip ----
+    const wk = document.getElementById("week");
+    wk.innerHTML = "";
+    let planned = 0, lifted = 0;
+    state.liftPlan.forEach((w, i) => {
+      const doneName = state.liftDone[i];
+      const shown = doneName || w;
+      if (w) planned++;
+      if (doneName) lifted++;
+      const d = el("div", "day" + (i === ti ? " today" : "") + (doneName ? " done" : "") + (editingPlan ? " editing" : ""));
+      d.append(el("div", "d", WEEK_LABELS[i]), el("div", "w" + (shown ? "" : " rest"), shown || "Rest"), el("div", "ck", doneName ? "✓" : ""));
+      d.addEventListener("click", () => {
+        if (editingPlan) {
+          const order = WORKOUT_NAMES.concat([""]);
+          state.liftPlan[i] = order[(order.indexOf(w) + 1) % order.length];
+        } else if (shown) {
+          state.liftDone[i] = state.liftDone[i] ? false : shown;
+        } else return;
+        changed();
+      });
+      wk.appendChild(d);
+    });
+    document.getElementById("liftCount").textContent = lifted + " / " + planned + " this week";
+    const ep = document.getElementById("editPlan");
+    ep.textContent = editingPlan ? "Done" : "Edit week";
+    ep.classList.toggle("on", editingPlan);
+    document.getElementById("liftNote").textContent = editingPlan
+      ? "Tap a day to switch: Push → Pull → Upper → Rest."
+      : "Resets every Monday. Your weights are saved forever.";
+
+    const ab = document.getElementById("abs");
+    ab.innerHTML = "";
+    let absN = 0;
+    state.absDone.forEach((on, i) => {
+      if (on) absN++;
+      const b = el("button", on ? "on" : "", WEEK_LABELS[i]);
+      b.addEventListener("click", () => { state.absDone[i] = !state.absDone[i]; changed(); });
+      ab.appendChild(b);
+    });
+    document.getElementById("absCount").textContent = absN + (absN === 1 ? " day" : " days") + " this week";
+
+    // ---- today's workout ----
+    const w = todaysLift();
+    const title = document.getElementById("tlTitle");
+    title.innerHTML = "";
+    if (w) { title.append("Today: "); title.appendChild(el("span", "", w)); }
+    else title.textContent = "Rest day — lifting anyway?";
+
+    const pick = document.getElementById("liftPick");
+    pick.innerHTML = "";
+    WORKOUT_NAMES.concat([""]).forEach(name => {
+      const c = el("button", "chip liftc" + (w === name ? " on" : ""), name || "Rest");
+      c.addEventListener("click", () => { state.todayLift = name; editingEx = false; syncLiftDone(); changed(); });
+      pick.appendChild(c);
+    });
+
+    const ee = document.getElementById("editEx");
+    ee.style.display = w ? "" : "none";
+    ee.textContent = editingEx ? "Done editing" : "Edit exercises";
+    ee.classList.toggle("on", editingEx);
+
+    const list = document.getElementById("exList");
+    list.innerHTML = "";
+    const edit = document.getElementById("exEdit");
+    edit.innerHTML = "";
+    if (!w) return;
+    const exs = state.workouts[w] || [];
+    if (!exs.length) list.appendChild(el("div", "empty", "No exercises yet. Tap “Edit exercises” to add some."));
+
+    exs.forEach(ex => {
+      const entry = todayEntry(ex.name) || {};
+      const last = lastWeight(ex.name);
+      const row = el("div", "row ex" + (entry.done ? " done" : ""));
+
+      if (editingEx) {
+        const info = el("div", "info");
+        info.append(el("div", "nm", ex.name), el("div", "meta", ex.sets));
+        const del = el("button", "del", "×"); del.title = "Remove";
+        del.addEventListener("click", () => { state.workouts[w] = exs.filter(x => x.id !== ex.id); syncLiftDone(); changed(); });
+        row.append(info, del);
+        list.appendChild(row);
+        return;
+      }
+
+      const box = checkBox();
+      box.addEventListener("click", () => { setEntry(ex.name, { done: !entry.done }); syncLiftDone(); changed(); });
+
+      const info = el("div", "info");
+      info.appendChild(el("div", "nm", ex.name));
+      const meta = el("div", "meta");
+      meta.append(ex.sets);
+      if (last) {
+        meta.append(" · Last: ");
+        meta.appendChild(el("span", "last", last.wt + " lbs"));
+        meta.append(" (" + last.label + ")");
+        const cur = parseFloat(entry.wt), prev = parseFloat(last.wt);
+        if (!isNaN(cur) && !isNaN(prev) && cur > prev) { meta.append(" "); meta.appendChild(el("span", "pr", "▲ +" + (Math.round((cur - prev) * 10) / 10))); }
+      } else {
+        meta.append(" · first time");
+      }
+      info.appendChild(meta);
+
+      const wrap = el("div", "wtwrap");
+      const inp = document.createElement("input");
+      inp.className = "wt";
+      inp.type = "text";
+      inp.inputMode = "decimal";
+      inp.placeholder = last ? String(last.wt) : "—";
+      inp.value = entry.wt || "";
+      inp.setAttribute("aria-label", ex.name + " weight in pounds");
+      inp.addEventListener("input", () => {
+        const val = inp.value.replace(/[^0-9.]/g, "").slice(0, 6);
+        if (val !== inp.value) inp.value = val;
+        setEntry(ex.name, { wt: val });
+        save();                                   // save without redrawing so typing isn't interrupted
+      });
+      wrap.append(inp, el("span", "", "lbs"));
+
+      row.append(box, info, wrap);
+      list.appendChild(row);
+    });
+
+    if (editingEx) {
+      const f = el("form", "exform");
+      const nm = document.createElement("input"); nm.className = "txt"; nm.placeholder = "New exercise (e.g. Dips)"; nm.maxLength = 60;
+      const sets = document.createElement("input"); sets.className = "txt sets"; sets.value = DEFAULT_SETS; sets.maxLength = 20;
+      const b = el("button", "btn lift", "Add"); b.type = "submit";
+      f.append(nm, sets, b);
+      f.addEventListener("submit", e => {
+        e.preventDefault();
+        const n = nm.value.trim();
+        if (!n) return;
+        state.workouts[w].push({ id: uid(), name: n, sets: sets.value.trim() || DEFAULT_SETS });
+        changed();
+        const again = document.querySelector("#exEdit input.txt");
+        if (again) again.focus();
+      });
+      edit.appendChild(f);
+      edit.appendChild(el("div", "liftnote", "Changes here apply to every " + w + " day."));
+    }
+  }
+
+  function toggleHabit(id) {
+    state.habits[id] = !state.habits[id];
+    if (state.history[id]) {
+      const k = todayKey();
+      state.history[id] = state.history[id].filter(x => x !== k);
+      if (state.habits[id]) state.history[id].push(k);
+    }
+    changed();
+  }
+
+  // ================= events =================
+  document.querySelectorAll("#dayType [data-type]").forEach(c =>
+    c.addEventListener("click", () => { state.dayType = c.dataset.type; changed(); }));
+  document.getElementById("workChip").addEventListener("click", () => { state.work = !state.work; changed(); });
+  document.querySelectorAll("#cats .chip").forEach(c =>
+    c.addEventListener("click", () => { newCat = c.dataset.cat; render(); }));
+  document.getElementById("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const inp = document.getElementById("taskInput");
+    const text = inp.value.trim();
+    if (!text) return;
+    state.tasks.push({ id: uid(), text, cat: newCat, done: false });
+    inp.value = "";
+    changed();
+  });
+  document.getElementById("clearDone").addEventListener("click", () => {
+    state.tasks = state.tasks.filter(t => !t.done); changed();
+  });
+  document.getElementById("editPlan").addEventListener("click", () => { editingPlan = !editingPlan; render(); });
+  document.getElementById("editEx").addEventListener("click", () => { editingEx = !editingEx; render(); });
+  document.getElementById("goalForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const inp = document.getElementById("goalInput");
+    const text = inp.value.trim();
+    if (!text) return;
+    state.goals.push({ id: uid(), text, done: false });
+    inp.value = "";
+    changed();
+  });
+
+  // backup + restore
+  let msgTimer = null;
+  function flash(t) {
+    const m = document.getElementById("msg");
+    m.textContent = t;
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(() => { m.textContent = ""; }, 4000);
+  }
+  document.getElementById("backupBtn").addEventListener("click", async () => {
+    const text = JSON.stringify(state);
+    try { await navigator.clipboard.writeText(text); flash("Backup copied. Paste it into Notes to keep it safe."); }
+    catch (e) {
+      const box = document.getElementById("restoreBox");
+      box.classList.add("show");
+      const ta = document.getElementById("restoreText");
+      ta.value = text; ta.select();
+      flash("Copy the text above and paste it into Notes.");
+    }
+  });
+  document.getElementById("restoreBtn").addEventListener("click", () => {
+    document.getElementById("restoreBox").classList.toggle("show");
+  });
+  document.getElementById("restoreGo").addEventListener("click", () => {
+    try {
+      const data = JSON.parse(document.getElementById("restoreText").value);
+      if (!data || typeof data !== "object" || !Array.isArray(data.tasks)) throw new Error("bad");
+      state = rollover(data);
+      changed();
+      document.getElementById("restoreBox").classList.remove("show");
+      document.getElementById("restoreText").value = "";
+      flash("Restored!");
+    } catch (e) { flash("That doesn't look like a backup. Paste the whole thing."); }
+  });
+
+  // install tip (iPhone in Safari, not yet on home screen)
+  (function installTip() {
+    const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    let hidden = false;
+    try { hidden = localStorage.getItem("hide-install-tip") === "1"; } catch (e) {}
+    if (ios && !standalone && !hidden) document.getElementById("install").classList.add("show");
+    document.getElementById("installX").addEventListener("click", () => {
+      document.getElementById("install").classList.remove("show");
+      try { localStorage.setItem("hide-install-tip", "1"); } catch (e) {}
+    });
+  })();
+
+  // new day while the app was open in the background
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && (state.day !== todayKey() || state.liftWeek !== weekKey())) { state = rollover(state); changed(); }
+  });
+  setInterval(() => { if (!document.activeElement || !document.activeElement.classList.contains("wt")) render(); }, 60000);
+
+  render();
+
+  // works offline once it's been opened
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+  }
+})();
+</script>
+</body>
+</html>
