@@ -179,6 +179,52 @@
   .mini.danger { border-color: var(--danger); color: var(--danger); }
   .rt input.txt { padding: 8px 10px; }
 
+  /* workout timer + summary */
+  .wk { margin-bottom: 12px; }
+  .wk:empty { display: none; }
+  .wk-start { width: 100%; }
+  .wk-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--lift-dim); border: 1px solid var(--lift); }
+  .wk-bar .info { flex: 1; min-width: 0; }
+  .wk-lbl { font-size: 12px; color: var(--muted); font-weight: 600; overflow-wrap: anywhere; }
+  .wk-clock { font-family: "Bebas Neue", sans-serif; font-size: 34px; letter-spacing: 1px; line-height: 1.05; color: var(--lift); font-variant-numeric: tabular-nums; }
+  .wk-note { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .wk-sum { padding: 14px; border-radius: 14px; background: var(--card2); border: 1px solid var(--lift); }
+  .wk-sum .hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .wk-sum .tt { font-family: "Bebas Neue", sans-serif; font-size: 22px; letter-spacing: .5px; color: var(--lift); }
+  .wk-sum .when { font-size: 12px; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 10px 0; }
+  .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px; text-align: center; min-width: 0; }
+  .stat b { display: block; font-family: "Bebas Neue", sans-serif; font-size: 24px; font-weight: 400; line-height: 1.1; overflow-wrap: anywhere; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .pr { font-size: 14px; padding: 3px 0; overflow-wrap: anywhere; }
+  .pr b { color: var(--life); }
+  .pr .was, .pr.was { color: var(--muted); font-size: 12px; }
+  .hist { margin-bottom: 14px; padding: 12px; border: 1px dashed var(--line); border-radius: 14px; }
+  .hist .sub { margin-top: 0; }
+  .hs-detail { font-size: 13px; color: var(--muted); padding: 0 12px 10px; margin-top: -4px; }
+  .hs-detail div { padding: 2px 0; overflow-wrap: anywhere; }
+  .hs-detail b { color: var(--text); font-weight: 600; }
+  /* per-exercise rest setting */
+  .rest-row { display: flex; align-items: center; gap: 6px; padding: 8px 4px 0; font-size: 13px; color: var(--muted); }
+  .rest-row .grow { flex: 1; min-width: 0; }
+  .rest-row .rv { min-width: 40px; text-align: center; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .rest-row.off .rv { color: var(--muted); text-decoration: line-through; }
+  .rest-row .mini { min-height: 36px; padding: 0 10px; }
+  .rest-row .chip { margin: 0; }
+  /* rest countdown bar */
+  .restbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--card); border-top: 1px solid var(--lift); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0,0,0,.45); }
+  .rb-in { max-width: 1020px; margin: 0 auto; }
+  .rb-track { height: 4px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 8px; }
+  .rb-track i { display: block; height: 100%; width: 100%; background: var(--lift); transition: width .25s linear; }
+  .rb-row { display: flex; align-items: center; gap: 8px; }
+  .rb-info { flex: 1; min-width: 0; }
+  .rb-lbl { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb-time { font-family: "Bebas Neue", sans-serif; font-size: 32px; line-height: 1; color: var(--lift); font-variant-numeric: tabular-nums; }
+  .rb-row .mini { min-height: 44px; padding: 0 10px; }
+  .restbar.over .rb-time { color: var(--accent); }
+  .restbar.over .rb-track i { background: var(--accent); }
+  body.resting .wrap { padding-bottom: 130px; }
+
   /* habit editor */
   #editHabits.on { color: var(--accent); }
   .hnote { font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -260,10 +306,13 @@
         <div class="tl-head">
           <div class="tl-title" id="tlTitle"></div>
           <div class="tl-links">
+            <button class="link" id="showHist">History</button>
             <button class="link" id="editRoutines">Routines</button>
             <button class="link" id="editEx">Edit exercises</button>
           </div>
         </div>
+        <div class="wk" id="wkBox"></div>
+        <div class="hist" id="histBox" hidden></div>
         <div class="routines" id="routineBox" hidden></div>
         <div class="chips" id="liftPick"></div>
         <div id="exList"></div>
@@ -309,6 +358,21 @@
   </footer>
 </div>
 
+<div class="restbar" id="restBar" hidden>
+  <div class="rb-in">
+    <div class="rb-track"><i id="rbFill"></i></div>
+    <div class="rb-row">
+      <div class="rb-info">
+        <div class="rb-lbl" id="rbName">Rest</div>
+        <div class="rb-time" id="rbTime" role="timer" aria-live="off">1:30</div>
+      </div>
+      <button class="mini" id="rbMinus" type="button" aria-label="15 seconds less">−15s</button>
+      <button class="mini" id="rbPlus" type="button" aria-label="15 seconds more">+15s</button>
+      <button class="btn lift" id="rbSkip" type="button">Skip</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   // ================= helpers =================
@@ -344,6 +408,8 @@
     Upper: ["Incline bench press", "Seated cable row", "Dumbbell shoulder press", "Hammer curls", "Overhead tricep extension"]
   };
   const DEFAULT_GOALS = ["Break into the starting lineup", "Go pro", "Finish CS50P"];
+  const REST_DEFAULT = 90, REST_MIN = 15, REST_MAX = 600;   // rest timer, in seconds
+  const MAX_SESSIONS = 500;                                  // finished workouts kept in history
   const blank7 = () => [false,false,false,false,false,false,false];
 
   function defaultDayType(d) {
@@ -404,6 +470,29 @@
     habitList.forEach(h => { if (!history[h.id]) history[h.id] = []; });
     const habits = {};
     if (s.habits && typeof s.habits === "object") Object.keys(s.habits).forEach(k => { if (!(k in Object.prototype)) habits[k] = !!s.habits[k]; });
+    const num = v => typeof v === "number" && isFinite(v);
+    // Running workout: only the start time is saved, so the clock is right even after closing the app.
+    const ss = s.session;
+    const session = ss && typeof ss === "object" && num(ss.start) ? {
+      start: ss.start,
+      day: typeof ss.day === "string" ? ss.day : dayKey(new Date(ss.start)),
+      routine: typeof ss.routine === "string" ? ss.routine : ""
+    } : null;
+    const rs = s.rest;
+    const rest = rs && typeof rs === "object" && num(rs.end) ? {
+      end: rs.end, total: num(rs.total) && rs.total > 0 ? rs.total : REST_DEFAULT, name: typeof rs.name === "string" ? rs.name : ""
+    } : null;
+    const restPrefs = {};
+    if (s.restPrefs && typeof s.restPrefs === "object") Object.keys(s.restPrefs).forEach(k => {
+      const p = s.restPrefs[k];
+      if ((k in Object.prototype) || !p || typeof p !== "object") return;
+      restPrefs[k] = { secs: num(p.secs) ? Math.min(Math.max(Math.round(p.secs), REST_MIN), REST_MAX) : REST_DEFAULT, on: p.on !== false };
+    });
+    const sessions = Array.isArray(s.sessions)
+      ? s.sessions.filter(x => x && typeof x === "object" && num(x.start) && num(x.end) && typeof x.day === "string")
+          .map(x => Object.assign({}, x, { exercises: Array.isArray(x.exercises) ? x.exercises : [], prs: Array.isArray(x.prs) ? x.prs : [] }))
+          .slice(-MAX_SESSIONS)
+      : [];
     return {
       v: 3,
       day: typeof s.day === "string" ? s.day : todayKey(),
@@ -421,6 +510,10 @@
       routines: routines,
       workouts: workouts,
       liftLog: s.liftLog && typeof s.liftLog === "object" ? s.liftLog : {},
+      session: session,
+      rest: rest,
+      restPrefs: restPrefs,
+      sessions: sessions,
       goals: Array.isArray(s.goals) ? s.goals : DEFAULT_GOALS.map(t => ({ id: uid(), text: t, done: false }))
     };
   }
@@ -459,6 +552,11 @@
     }, 250);
   }
   function changed() { render(); save(); }
+  // Save right now (used when the app is being closed, so a just-started timer isn't lost).
+  function saveNow() {
+    clearTimeout(saveTimer);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+  }
 
   let state = rollover(load());
 
@@ -541,7 +639,11 @@
   function todaySets(ex) {
     const e = todayEntry(ex.name);
     if (e && Array.isArray(e.sets) && e.sets.length)
-      return e.sets.map(x => ({ wt: cleanWt(x && x.wt), reps: cleanReps(x && x.reps), done: !!(x && x.done) }));
+      return e.sets.map(x => {
+        const r = { wt: cleanWt(x && x.wt), reps: cleanReps(x && x.reps), done: !!(x && x.done) };
+        if (r.done && typeof x.at === "number") r.at = x.at;   // when the set was checked (for workout summaries)
+        return r;
+      });
     const rows = [];
     for (let i = 0, n = planSets(ex.sets); i < n; i++) rows.push(blankSet());
     if (e) {                                   // logged today with the older one-weight version
@@ -595,6 +697,7 @@
     state.liftPlan = state.liftPlan.map(swap);
     state.liftDone = state.liftDone.map(swap);
     if (state.todayLift === oldName) state.todayLift = n;
+    if (state.session && state.session.routine === oldName) state.session.routine = n;
     Object.keys(state.liftLog).forEach(d => { const l = state.liftLog[d]; if (l && l.w === oldName) l.w = n; });
   }
   // Exercise weights are kept in the log, so "Last: ___ lbs" still works if you re-add an exercise later.
@@ -603,6 +706,286 @@
     delete state.workouts[n];
     state.liftPlan = state.liftPlan.map(v => (v === n ? "" : v));
     if (state.todayLift === n) state.todayLift = null;
+  }
+
+  // ================= workout timer, rest timer, history =================
+  const mmss = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + pad(s % 60); };
+  const hhmmss = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60); };
+  const duration = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600); return (h ? h + ":" + pad(Math.floor(s / 60) % 60) : Math.floor(s / 60)) + ":" + pad(s % 60); };
+  const numFmt = n => Math.round(n).toLocaleString("en-US");
+  const shortDate = day => { const d = new Date(day + "T12:00:00"); return SHORT_DAYS[d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate(); };
+
+  // Rest settings are kept per exercise name, like the log.
+  function restPref(name) {
+    const p = hasOwn(state.restPrefs, norm(name)) ? state.restPrefs[norm(name)] : null;
+    return { secs: p ? p.secs : REST_DEFAULT, on: p ? p.on : true };
+  }
+  function setRestPref(name, patch) {
+    const p = Object.assign(restPref(name), patch);
+    p.secs = Math.min(Math.max(p.secs, REST_MIN), REST_MAX);
+    state.restPrefs[norm(name)] = p;
+  }
+  // The end time is saved (not a countdown), so it stays right if you leave the app.
+  function startRest(name) {
+    const p = restPref(name);
+    if (!p.on) return;
+    state.rest = { end: Date.now() + p.secs * 1000, total: p.secs, name: String(name).slice(0, 60) };
+    restOverAt = 0;
+  }
+  function adjustRest(delta) {
+    if (!state.rest) return;
+    const left = state.rest.end - Date.now() + delta * 1000;
+    if (left <= 0) state.rest = null;
+    else { state.rest.end = Date.now() + left; state.rest.total = Math.max(state.rest.total + delta, Math.ceil(left / 1000)); }
+    save(); tick();
+  }
+
+  // Sound: phones only allow it after a tap, so we "unlock" it whenever you tap.
+  let audioCtx = null;
+  function unlockAudio() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const src = audioCtx.createBufferSource();      // a silent blip unlocks sound on iPhone
+      src.buffer = audioCtx.createBuffer(1, 1, 22050);
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) {}
+  }
+  function beep() {
+    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+    if (!audioCtx) return;
+    try {
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const t0 = audioCtx.currentTime + 0.03;
+      [0, 0.22, 0.44].forEach((off, i) => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = "sine";
+        o.frequency.value = i === 2 ? 1320 : 880;
+        g.gain.setValueAtTime(0.0001, t0 + off);
+        g.gain.exponentialRampToValueAtTime(0.35, t0 + off + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + off + 0.17);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t0 + off); o.stop(t0 + off + 0.2);
+      });
+    } catch (e) {}
+  }
+
+  // Runs 4× a second. Only touches the clock and the rest bar, so typing isn't interrupted.
+  let restOverAt = 0;
+  function tick() {
+    const now = Date.now();
+    const clk = document.getElementById("wkClock");
+    if (clk && state.session) clk.textContent = hhmmss(now - state.session.start);
+
+    if (state.rest && now >= state.rest.end) {
+      if (now - state.rest.end < 5000) { beep(); restOverAt = now; }   // don't beep for a rest that ended while the app was closed
+      state.rest = null;
+      save();
+    }
+    const bar = document.getElementById("restBar");
+    const over = !state.rest && now - restOverAt < 2500;
+    bar.hidden = !state.rest && !over;
+    bar.classList.toggle("over", over);
+    document.body.classList.toggle("resting", !bar.hidden);
+    if (state.rest) {
+      const left = (state.rest.end - now) / 1000;
+      document.getElementById("rbName").textContent = "Rest · " + state.rest.name;
+      document.getElementById("rbTime").textContent = mmss(Math.ceil(left));
+      document.getElementById("rbFill").style.width = Math.max(0, Math.min(100, left / state.rest.total * 100)) + "%";
+    } else if (over) {
+      document.getElementById("rbName").textContent = "Rest over";
+      document.getElementById("rbTime").textContent = "Next set!";
+      document.getElementById("rbFill").style.width = "0%";
+    }
+  }
+
+  // Display names for logged exercises (the log keys are lowercase).
+  function exerciseNames() {
+    const names = {};
+    state.routines.forEach(r => (state.workouts[r] || []).forEach(ex => { if (!hasOwn(names, norm(ex.name))) names[norm(ex.name)] = ex.name; }));
+    return names;
+  }
+  const bestOf = sets => sets.reduce((m, x) => Math.max(m, parseFloat(x && x.wt) || 0), 0);
+
+  // Heaviest weight for an exercise before this workout: older log days plus earlier saved workouts.
+  function previousBest(key, day) {
+    let best = 0;
+    Object.keys(state.liftLog).forEach(d => {
+      const log = state.liftLog[d];
+      if (d < day && log && hasOwn(log.ex, key)) best = Math.max(best, bestOf(loggedSets(log.ex[key]).filter(Boolean)));
+    });
+    state.sessions.forEach(s => s.exercises.forEach(e => {
+      if (e && Array.isArray(e.sets) && (e.key || norm(e.name)) === key) best = Math.max(best, bestOf(e.sets));
+    }));
+    return best;
+  }
+
+  // Everything you checked off since the workout's day started (but not sets already in an earlier workout).
+  function buildSummary(sess, end) {
+    const today = dayKey(new Date(end));
+    const dayStart = new Date(sess.day + "T00:00:00").getTime();
+    const cutoff = state.sessions.reduce((m, s) => (s.end > dayStart ? Math.max(m, s.end) : m), -Infinity);
+    const byKey = {};
+    Object.keys(state.liftLog).filter(d => d >= sess.day && d <= today).sort().forEach(d => {
+      const log = state.liftLog[d];
+      if (!log || !log.ex || typeof log.ex !== "object") return;
+      Object.keys(log.ex).forEach(k => {
+        const e = log.ex[k];
+        if (!e || !Array.isArray(e.sets)) return;
+        const sets = e.sets.filter(x => x && x.done && (typeof x.at === "number" ? x.at : 0) > cutoff)
+          .map(x => ({ wt: cleanWt(x.wt), reps: cleanReps(x.reps) }));
+        if (sets.length) byKey[k] = (byKey[k] || []).concat(sets);
+      });
+    });
+    const names = exerciseNames();
+    const order = (state.workouts[sess.routine] || []).map(ex => norm(ex.name));
+    const keys = Object.keys(byKey).sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      if (ia >= 0 || ib >= 0) return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+      return a < b ? -1 : 1;
+    });
+    let sets = 0, volume = 0;
+    const exercises = [], prs = [];
+    keys.forEach(k => {
+      const list = byKey[k];
+      const name = names[k] || k.charAt(0).toUpperCase() + k.slice(1);
+      sets += list.length;
+      list.forEach(x => { const w = parseFloat(x.wt), r = parseInt(x.reps, 10); if (w > 0 && r > 0) volume += w * r; });
+      const top = bestOf(list), prev = previousBest(k, sess.day);
+      if (top > 0 && prev > 0 && top > prev) prs.push({ name: name, wt: top, prev: prev });
+      exercises.push({ key: k, name: name, sets: list });
+    });
+    return {
+      id: uid(), day: sess.day, routine: sess.routine, start: sess.start, end: end,
+      sets: sets, volume: Math.round(volume), prs: prs, exercises: exercises
+    };
+  }
+
+  let summaryId = null;        // finished workout whose summary is showing
+  let finishConfirm = false;   // "No sets checked — finish anyway?"
+  let discardConfirm = false;
+  let showingHist = false;
+  const openHist = new Set();  // history rows opened to show their sets
+
+  function startWorkout(w) {
+    state.session = { start: Date.now(), day: todayKey(), routine: w || "" };
+    summaryId = null; finishConfirm = false; discardConfirm = false;
+    unlockAudio();
+    changed(); saveNow();
+  }
+  function finishWorkout() {
+    const sess = state.session;
+    if (!sess) return;
+    const rec = buildSummary(sess, Date.now());
+    if (!rec.sets && !finishConfirm) { finishConfirm = true; discardConfirm = false; render(); return; }
+    state.sessions.push(rec);
+    if (state.sessions.length > MAX_SESSIONS) state.sessions = state.sessions.slice(-MAX_SESSIONS);
+    state.session = null;
+    state.rest = null;
+    // count it on this week's strip
+    if (rec.sets && rec.routine && sess.day >= state.liftWeek) state.liftDone[weekIndex(new Date(sess.day + "T12:00:00"))] = rec.routine;
+    summaryId = rec.id; finishConfirm = false; discardConfirm = false;
+    changed(); saveNow(); tick();
+  }
+
+  function statBox(val, label) { const s = el("div", "stat"); s.append(el("b", "", val), el("span", "", label)); return s; }
+  function summaryCard(rec, onClose) {
+    const c = el("div", "wk-sum");
+    const hd = el("div", "hd");
+    const t = el("div");
+    t.append(el("div", "tt", "Workout done 💪"), el("div", "when", (rec.routine || "Lift") + " · " + shortDate(rec.day)));
+    const x = el("button", "del", "×"); x.title = "Close"; x.type = "button";
+    x.addEventListener("click", onClose);
+    hd.append(t, x);
+    const st = el("div", "stats");
+    st.append(statBox(duration(rec.end - rec.start), "Total time"), statBox(String(rec.sets), rec.sets === 1 ? "Set" : "Sets"), statBox(numFmt(rec.volume), "Volume (lbs)"));
+    c.append(hd, st);
+    if (rec.prs.length) rec.prs.forEach(p => {
+      const r = el("div", "pr");
+      r.append("🏆 New PR: ", el("b", "", p.name + " — " + p.wt + " lbs"), " ", el("span", "was", "(was " + p.prev + ")"));
+      c.appendChild(r);
+    });
+    else c.appendChild(el("div", "pr was", "No new PRs this time. Keep stacking."));
+    return c;
+  }
+
+  function renderWorkout(w) {
+    const box = document.getElementById("wkBox");
+    box.innerHTML = "";
+    const sess = state.session;
+    if (sess) {
+      const bar = el("div", "wk-bar");
+      const info = el("div", "info");
+      const clock = el("div", "wk-clock", hhmmss(Date.now() - sess.start));
+      clock.id = "wkClock";
+      clock.setAttribute("role", "timer");
+      info.append(el("div", "wk-lbl", "Workout · " + (sess.routine || "Lift") + " · started " + fmt(new Date(sess.start).getHours() * 60 + new Date(sess.start).getMinutes())), clock);
+      const fin = el("button", "btn lift", finishConfirm ? "Finish anyway" : "Finish");
+      fin.type = "button";
+      fin.addEventListener("click", finishWorkout);
+      bar.append(info, fin);
+      box.appendChild(bar);
+      const note = el("div", "wk-note");
+      if (finishConfirm) note.appendChild(el("span", "", "No sets checked off yet."));
+      if (discardConfirm) {
+        note.appendChild(el("span", "", "Throw away this timer? Your sets stay logged."));
+        const yes = el("button", "mini danger", "Discard"); yes.type = "button";
+        yes.addEventListener("click", () => { state.session = null; discardConfirm = false; finishConfirm = false; changed(); saveNow(); });
+        const no = el("button", "mini", "Keep going"); no.type = "button";
+        no.addEventListener("click", () => { discardConfirm = false; render(); });
+        note.append(yes, no);
+      } else {
+        const d = el("button", "link", "Discard timer"); d.type = "button";
+        d.addEventListener("click", () => { discardConfirm = true; finishConfirm = false; render(); });
+        note.appendChild(d);
+      }
+      box.appendChild(note);
+      return;
+    }
+    const rec = summaryId ? state.sessions.find(s => s.id === summaryId) : null;
+    if (rec) { box.appendChild(summaryCard(rec, () => { summaryId = null; render(); })); return; }
+    if (w) {
+      const b = el("button", "btn lift wk-start", "▶ Start workout");
+      b.type = "button";
+      b.addEventListener("click", () => startWorkout(w));
+      box.appendChild(b);
+    }
+  }
+
+  function renderHistory() {
+    const hl = document.getElementById("showHist");
+    hl.textContent = showingHist ? "Close history" : "History";
+    hl.classList.toggle("on", showingHist);
+    const box = document.getElementById("histBox");
+    box.hidden = !showingHist;
+    box.innerHTML = "";
+    if (!showingHist) return;
+    box.appendChild(el("div", "sub", "Past workouts"));
+    if (!state.sessions.length) { box.appendChild(el("div", "empty", "No finished workouts yet. Tap “Start workout”, then “Finish” when you're done.")); return; }
+    state.sessions.slice().reverse().forEach(s => {
+      const row = el("div", "row rt click");
+      const info = el("div", "info");
+      const bits = [duration(s.end - s.start), s.sets + (s.sets === 1 ? " set" : " sets"), numFmt(s.volume || 0) + " lbs"];
+      if (s.prs.length) bits.push("🏆 " + s.prs.length + (s.prs.length === 1 ? " PR" : " PRs"));
+      info.append(el("div", "nm", (s.routine || "Lift") + " · " + shortDate(s.day)), el("div", "meta", bits.join(" · ")));
+      row.append(info, el("span", "m", openHist.has(s.id) ? "▾" : "▸"));
+      row.addEventListener("click", () => { if (openHist.has(s.id)) openHist.delete(s.id); else openHist.add(s.id); render(); });
+      box.appendChild(row);
+      if (!openHist.has(s.id)) return;
+      const det = el("div", "hs-detail");
+      if (!s.exercises.length) det.appendChild(el("div", "", "No sets logged."));
+      s.exercises.forEach(e => {
+        if (!e || !Array.isArray(e.sets)) return;
+        const d = el("div");
+        d.append(el("b", "", str(e.name)), ": " + e.sets.map(x => x.wt && x.reps ? x.wt + "×" + x.reps : x.wt ? x.wt + " lbs" : x.reps ? x.reps + " reps" : "✓").join(", "));
+        det.appendChild(d);
+      });
+      s.prs.forEach(p => det.appendChild(el("div", "", "🏆 " + p.name + " — " + p.wt + " lbs (was " + p.prev + ")")));
+      box.appendChild(det);
+    });
   }
 
   // ================= render =================
@@ -783,11 +1166,17 @@
 
     const pick = document.getElementById("liftPick");
     pick.innerHTML = "";
+    renderWorkout(w);
+    renderHistory();
     renderRoutines();
 
     state.routines.concat([""]).forEach(name => {
       const c = el("button", "chip liftc" + (w === name ? " on" : ""), name || "Rest");
-      c.addEventListener("click", () => { state.todayLift = name; editingEx = false; syncLiftDone(); changed(); });
+      c.addEventListener("click", () => {
+        state.todayLift = name; editingEx = false;
+        if (state.session && name) state.session.routine = name;
+        syncLiftDone(); changed();
+      });
       pick.appendChild(c);
     });
 
@@ -917,6 +1306,8 @@
           if (x.reps === "" && hintReps) x.reps = cleanReps(hintReps);
         }
         x.done = !x.done;
+        if (x.done) { x.at = Date.now(); unlockAudio(); startRest(ex.name); }
+        else delete x.at;
         summarize(ex); syncLiftDone(); changed();
       });
       const td = el("td");
@@ -947,6 +1338,26 @@
     });
     foot.append(rm, add);
     body.appendChild(foot);
+
+    // rest timer for this exercise: on/off and length
+    const rp = restPref(ex.name);
+    const rr = el("div", "rest-row" + (rp.on ? "" : " off"));
+    rr.appendChild(el("span", "grow", "⏱ Rest timer"));
+    const less = el("button", "mini", "−15");
+    less.type = "button"; less.disabled = !rp.on || rp.secs <= REST_MIN;
+    less.setAttribute("aria-label", "Shorter rest for " + ex.name);
+    less.addEventListener("click", () => { setRestPref(ex.name, { secs: rp.secs - 15 }); changed(); });
+    const more = el("button", "mini", "+15");
+    more.type = "button"; more.disabled = !rp.on || rp.secs >= REST_MAX;
+    more.setAttribute("aria-label", "Longer rest for " + ex.name);
+    more.addEventListener("click", () => { setRestPref(ex.name, { secs: rp.secs + 15 }); changed(); });
+    const tog = el("button", "chip liftc" + (rp.on ? " on" : ""), rp.on ? "On" : "Off");
+    tog.type = "button";
+    tog.setAttribute("aria-pressed", rp.on ? "true" : "false");
+    tog.setAttribute("aria-label", "Rest timer for " + ex.name);
+    tog.addEventListener("click", () => { setRestPref(ex.name, { on: !rp.on }); changed(); });
+    rr.append(less, el("span", "rv", mmss(rp.secs)), more, tog);
+    body.appendChild(rr);
     card.appendChild(body);
     return card;
   }
@@ -1215,6 +1626,12 @@
     render();
   });
   document.getElementById("editPlan").addEventListener("click", () => { editingPlan = !editingPlan; render(); });
+  document.getElementById("showHist").addEventListener("click", () => { showingHist = !showingHist; render(); });
+  document.getElementById("rbMinus").addEventListener("click", () => adjustRest(-15));
+  document.getElementById("rbPlus").addEventListener("click", () => adjustRest(15));
+  document.getElementById("rbSkip").addEventListener("click", () => { state.rest = null; restOverAt = 0; save(); tick(); });
+  // any tap keeps sound unlocked for the rest-over beep
+  document.addEventListener("pointerdown", () => { if (!audioCtx || audioCtx.state !== "running") unlockAudio(); }, true);
   document.getElementById("editEx").addEventListener("click", () => { editingEx = !editingEx; render(); });
   document.getElementById("editRoutines").addEventListener("click", () => {
     editingRoutines = !editingRoutines; renaming = null; confirmDel = null; routineNote = ""; render();
@@ -1278,11 +1695,16 @@
 
   // new day while the app was open in the background
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && (state.day !== todayKey() || state.liftWeek !== weekKey())) { state = rollover(state); changed(); }
+    if (document.hidden) { saveNow(); return; }
+    if (state.day !== todayKey() || state.liftWeek !== weekKey()) { state = rollover(state); changed(); }
+    tick();
   });
+  window.addEventListener("pagehide", saveNow);
+  setInterval(tick, 250);
   setInterval(() => { const a = document.activeElement; if (!a || a.tagName !== "INPUT") render(); }, 60000);
 
   render();
+  tick();
 
   // works offline once it's been opened
   if ("serviceWorker" in navigator) {
