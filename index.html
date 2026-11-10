@@ -103,10 +103,10 @@
   .link.on { color: var(--lift); }
 
   /* lifting */
-  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
   .day { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 2px; text-align: center; cursor: pointer; user-select: none; min-height: 70px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .day .d { font-size: 11px; color: var(--muted); font-weight: 600; }
-  .day .w { font-size: 12px; font-weight: 700; }
+  .day .w { font-size: 12px; font-weight: 700; line-height: 1.15; max-width: 100%; padding: 0 2px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .day .w.rest { color: var(--muted); font-weight: 400; }
   .day.today { border-color: var(--text); }
   .day.done { background: var(--lift-dim); border-color: var(--lift); }
@@ -135,6 +135,16 @@
   .exform { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
   .exform input.txt { padding: 9px 10px; }
   .exform .sets { flex: 0 0 96px; }
+  .tl-links { display: flex; gap: 14px; flex: none; }
+  .routines { margin-bottom: 14px; padding: 12px; border: 1px dashed var(--line); border-radius: 14px; }
+  .routines .sub { margin-top: 0; }
+  .rt .info { flex: 1; min-width: 0; }
+  .rt .nm { font-weight: 600; overflow-wrap: anywhere; }
+  .rt .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .rt .acts { display: flex; gap: 6px; flex: none; align-items: center; }
+  .rt .mini { background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; font: inherit; font-size: 13px; padding: 0 12px; min-height: 36px; cursor: pointer; }
+  .rt .mini.danger { border-color: var(--danger); color: var(--danger); }
+  .rt input.txt { padding: 8px 10px; }
 
   .goal.done .n { color: var(--life); }
   .goal .trophy { font-size: 16px; }
@@ -199,8 +209,12 @@
       <div class="today-lift">
         <div class="tl-head">
           <div class="tl-title" id="tlTitle"></div>
-          <button class="link" id="editEx">Edit exercises</button>
+          <div class="tl-links">
+            <button class="link" id="editRoutines">Routines</button>
+            <button class="link" id="editEx">Edit exercises</button>
+          </div>
         </div>
+        <div class="routines" id="routineBox" hidden></div>
         <div class="chips" id="liftPick"></div>
         <div id="exList"></div>
         <div id="exEdit"></div>
@@ -268,7 +282,7 @@
     { id: "spanish",  name: "Spanish",          meta: "daily",  streak: true },
     { id: "stretch",  name: "Night stretch",    meta: "20 min" }
   ];
-  const WORKOUT_NAMES = ["Push", "Pull", "Upper"];
+  const DEFAULT_ROUTINES = ["Push", "Pull", "Upper"];   // starting routines; you can add, rename and delete your own
   const DEFAULT_PLAN = ["Push", "Pull", "", "Upper", "", "", ""];
   const DEFAULT_SETS = "2 × 6–8";
   const DEFAULT_WORKOUTS = {
@@ -286,16 +300,33 @@
     return "practice";
   }
 
+  // Routine names become keys in saved data, so keep them sensible.
+  function validRoutineName(n) {
+    return n.length <= 30 && norm(n) !== "rest" && !(n in Object.prototype);
+  }
+
   // Make sure every field exists (so older saves keep working after updates).
   function normalize(s) {
     if (!s || typeof s !== "object") s = {};
+    const savedWorkouts = s.workouts && typeof s.workouts === "object" ? s.workouts : {};
+    const plan = Array.isArray(s.liftPlan) && s.liftPlan.length === 7 ? s.liftPlan : DEFAULT_PLAN.slice();
+    // Routine order. Older saves had no list (just Push/Pull/Upper), so build one from what's there.
+    let names = Array.isArray(s.routines) ? s.routines
+      : DEFAULT_ROUTINES.concat(Object.keys(savedWorkouts), plan);
+    const routines = [];
+    names.forEach(n => {
+      if (typeof n !== "string") return;
+      n = n.trim();
+      if (n && validRoutineName(n) && !routines.some(r => norm(r) === norm(n))) routines.push(n);
+    });
     const workouts = {};
-    WORKOUT_NAMES.forEach(w => {
-      const list = s.workouts && Array.isArray(s.workouts[w]) ? s.workouts[w] : null;
-      workouts[w] = list || DEFAULT_WORKOUTS[w].map(n => ({ id: uid(), name: n, sets: DEFAULT_SETS }));
+    routines.forEach(w => {
+      const list = Object.prototype.hasOwnProperty.call(savedWorkouts, w) && Array.isArray(savedWorkouts[w]) ? savedWorkouts[w] : null;
+      if (list) workouts[w] = list;
+      else if (!Array.isArray(s.routines) && DEFAULT_WORKOUTS[w]) workouts[w] = DEFAULT_WORKOUTS[w].map(n => ({ id: uid(), name: n, sets: DEFAULT_SETS }));
+      else workouts[w] = [];
     });
     const liftDone = Array.isArray(s.liftDone) && s.liftDone.length === 7 ? s.liftDone.slice() : blank7();
-    const plan = Array.isArray(s.liftPlan) && s.liftPlan.length === 7 ? s.liftPlan : DEFAULT_PLAN.slice();
     liftDone.forEach((v, i) => { if (v === true) liftDone[i] = plan[i] || "Lift"; }); // old true/false saves
     return {
       v: 2,
@@ -310,6 +341,7 @@
       liftDone: liftDone,
       absDone: Array.isArray(s.absDone) && s.absDone.length === 7 ? s.absDone : blank7(),
       todayLift: typeof s.todayLift === "string" ? s.todayLift : null,
+      routines: routines,
       workouts: workouts,
       liftLog: s.liftLog && typeof s.liftLog === "object" ? s.liftLog : {},
       goals: Array.isArray(s.goals) ? s.goals : DEFAULT_GOALS.map(t => ({ id: uid(), text: t, done: false }))
@@ -413,10 +445,47 @@
     state.liftDone[i] = all ? w : false;
   }
 
+  // ================= routines =================
+  // Returns an error message, or "" if the name is OK. `except` is the routine being renamed.
+  function routineNameError(n, except) {
+    if (!n) return "Give the routine a name.";
+    if (!validRoutineName(n)) return norm(n) === "rest" ? "“Rest” is already used for rest days." : "Try a different name.";
+    if (state.routines.some(r => r !== except && norm(r) === norm(n))) return "You already have a routine called " + n + ".";
+    return "";
+  }
+  function addRoutine(n) {
+    state.routines.push(n);
+    state.workouts[n] = [];
+  }
+  function renameRoutine(oldName, n) {
+    if (oldName === n) return;
+    const i = state.routines.indexOf(oldName);
+    if (i < 0) return;
+    state.routines[i] = n;
+    state.workouts[n] = state.workouts[oldName] || [];
+    delete state.workouts[oldName];
+    const swap = v => (v === oldName ? n : v);
+    state.liftPlan = state.liftPlan.map(swap);
+    state.liftDone = state.liftDone.map(swap);
+    if (state.todayLift === oldName) state.todayLift = n;
+    Object.keys(state.liftLog).forEach(d => { const l = state.liftLog[d]; if (l && l.w === oldName) l.w = n; });
+  }
+  // Exercise weights are kept in the log, so "Last: ___ lbs" still works if you re-add an exercise later.
+  function deleteRoutine(n) {
+    state.routines = state.routines.filter(r => r !== n);
+    delete state.workouts[n];
+    state.liftPlan = state.liftPlan.map(v => (v === n ? "" : v));
+    if (state.todayLift === n) state.todayLift = null;
+  }
+
   // ================= render =================
   let newCat = "school";
   let editingPlan = false;
   let editingEx = false;
+  let editingRoutines = false;
+  let renaming = null;        // routine name being renamed
+  let confirmDel = null;      // routine name waiting for "Delete?" confirmation
+  let routineNote = "";       // message shown in the routines box
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -544,7 +613,7 @@
       d.append(el("div", "d", WEEK_LABELS[i]), el("div", "w" + (shown ? "" : " rest"), shown || "Rest"), el("div", "ck", doneName ? "✓" : ""));
       d.addEventListener("click", () => {
         if (editingPlan) {
-          const order = WORKOUT_NAMES.concat([""]);
+          const order = state.routines.concat([""]);
           state.liftPlan[i] = order[(order.indexOf(w) + 1) % order.length];
         } else if (shown) {
           state.liftDone[i] = state.liftDone[i] ? false : shown;
@@ -558,7 +627,7 @@
     ep.textContent = editingPlan ? "Done" : "Edit week";
     ep.classList.toggle("on", editingPlan);
     document.getElementById("liftNote").textContent = editingPlan
-      ? "Tap a day to switch: Push → Pull → Upper → Rest."
+      ? "Tap a day to switch: " + state.routines.concat(["Rest"]).join(" → ") + "."
       : "Resets every Monday. Your weights are saved forever.";
 
     const ab = document.getElementById("abs");
@@ -581,14 +650,16 @@
 
     const pick = document.getElementById("liftPick");
     pick.innerHTML = "";
-    WORKOUT_NAMES.concat([""]).forEach(name => {
+    renderRoutines();
+
+    state.routines.concat([""]).forEach(name => {
       const c = el("button", "chip liftc" + (w === name ? " on" : ""), name || "Rest");
       c.addEventListener("click", () => { state.todayLift = name; editingEx = false; syncLiftDone(); changed(); });
       pick.appendChild(c);
     });
 
     const ee = document.getElementById("editEx");
-    ee.style.display = w ? "" : "none";
+    ee.style.display = w && state.workouts[w] ? "" : "none";
     ee.textContent = editingEx ? "Done editing" : "Edit exercises";
     ee.classList.toggle("on", editingEx);
 
@@ -653,7 +724,7 @@
       list.appendChild(row);
     });
 
-    if (editingEx) {
+    if (editingEx && state.workouts[w]) {
       const f = el("form", "exform");
       const nm = document.createElement("input"); nm.className = "txt"; nm.placeholder = "New exercise (e.g. Dips)"; nm.maxLength = 60;
       const sets = document.createElement("input"); sets.className = "txt sets"; sets.value = DEFAULT_SETS; sets.maxLength = 20;
@@ -663,6 +734,7 @@
         e.preventDefault();
         const n = nm.value.trim();
         if (!n) return;
+        if (!state.workouts[w]) return;
         state.workouts[w].push({ id: uid(), name: n, sets: sets.value.trim() || DEFAULT_SETS });
         changed();
         const again = document.querySelector("#exEdit input.txt");
@@ -671,6 +743,86 @@
       edit.appendChild(f);
       edit.appendChild(el("div", "liftnote", "Changes here apply to every " + w + " day."));
     }
+  }
+
+  function renderRoutines() {
+    const rl = document.getElementById("editRoutines");
+    rl.textContent = editingRoutines ? "Done" : "Routines";
+    rl.classList.toggle("on", editingRoutines);
+    const box = document.getElementById("routineBox");
+    box.hidden = !editingRoutines;
+    box.innerHTML = "";
+    if (!editingRoutines) return;
+
+    box.appendChild(el("div", "sub", "Your routines"));
+    if (!state.routines.length) box.appendChild(el("div", "empty", "No routines yet. Add one below."));
+    state.routines.forEach(name => {
+      const row = el("div", "row rt");
+      const count = (state.workouts[name] || []).length;
+
+      if (renaming === name) {
+        const f = el("form", "exform");
+        f.style.cssText = "flex:1;margin:0;flex-wrap:nowrap";
+        const inp = document.createElement("input");
+        inp.className = "txt"; inp.value = name; inp.maxLength = 30; inp.autocomplete = "off";
+        inp.setAttribute("aria-label", "New name for " + name);
+        const ok = el("button", "btn lift", "Save"); ok.type = "submit";
+        const cancel = el("button", "mini", "Cancel"); cancel.type = "button";
+        cancel.addEventListener("click", () => { renaming = null; routineNote = ""; render(); });
+        f.addEventListener("submit", e => {
+          e.preventDefault();
+          const n = inp.value.trim();
+          const err = routineNameError(n, name);
+          if (err) { routineNote = err; render(); return; }
+          renameRoutine(name, n);
+          renaming = null; routineNote = "";
+          changed();
+        });
+        const acts = el("div", "acts"); acts.append(ok, cancel);
+        f.append(inp, acts);
+        row.appendChild(f);
+        box.appendChild(row);
+        setTimeout(() => { if (document.activeElement !== inp) { inp.focus(); inp.select(); } }, 0);
+        return;
+      }
+
+      const info = el("div", "info");
+      info.append(el("div", "nm", name), el("div", "meta", count + (count === 1 ? " exercise" : " exercises")));
+      const acts = el("div", "acts");
+      if (confirmDel === name) {
+        const yes = el("button", "mini danger", "Delete");
+        yes.addEventListener("click", () => { deleteRoutine(name); confirmDel = null; routineNote = "Deleted " + name + "."; changed(); });
+        const no = el("button", "mini", "Cancel");
+        no.addEventListener("click", () => { confirmDel = null; render(); });
+        info.lastChild.textContent = "Delete this routine?";
+        acts.append(yes, no);
+      } else {
+        const ren = el("button", "mini", "Rename");
+        ren.addEventListener("click", () => { renaming = name; confirmDel = null; routineNote = ""; render(); });
+        const del = el("button", "del", "×"); del.title = "Delete " + name;
+        del.addEventListener("click", () => { confirmDel = name; renaming = null; routineNote = ""; render(); });
+        acts.append(ren, del);
+      }
+      row.append(info, acts);
+      box.appendChild(row);
+    });
+
+    const f = el("form", "exform");
+    const nm = document.createElement("input");
+    nm.className = "txt"; nm.placeholder = "New routine (e.g. Arms)"; nm.maxLength = 30; nm.autocomplete = "off";
+    const b = el("button", "btn lift", "Add"); b.type = "submit";
+    f.append(nm, b);
+    f.addEventListener("submit", e => {
+      e.preventDefault();
+      const n = nm.value.trim();
+      const err = routineNameError(n, null);
+      if (err) { routineNote = err; render(); return; }
+      addRoutine(n);
+      routineNote = "Added " + n + ". Pick it below, then tap “Edit exercises”.";
+      changed();
+    });
+    box.appendChild(f);
+    box.appendChild(el("div", "liftnote", routineNote || "To give a routine its exercises, pick it below and tap “Edit exercises”."));
   }
 
   function toggleHabit(id) {
@@ -703,6 +855,9 @@
   });
   document.getElementById("editPlan").addEventListener("click", () => { editingPlan = !editingPlan; render(); });
   document.getElementById("editEx").addEventListener("click", () => { editingEx = !editingEx; render(); });
+  document.getElementById("editRoutines").addEventListener("click", () => {
+    editingRoutines = !editingRoutines; renaming = null; confirmDel = null; routineNote = ""; render();
+  });
   document.getElementById("goalForm").addEventListener("submit", e => {
     e.preventDefault();
     const inp = document.getElementById("goalInput");
@@ -764,7 +919,7 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && (state.day !== todayKey() || state.liftWeek !== weekKey())) { state = rollover(state); changed(); }
   });
-  setInterval(() => { if (!document.activeElement || !document.activeElement.classList.contains("wt")) render(); }, 60000);
+  setInterval(() => { const a = document.activeElement; if (!a || a.tagName !== "INPUT") render(); }, 60000);
 
   render();
 
